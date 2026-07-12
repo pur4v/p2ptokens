@@ -1,0 +1,29 @@
+[package]
+name = "p2ptokens-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "p2ptokens"
+path = "src/main.rs"
+
+[dependencies]
+p2ptokens-shared.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+futures.workspace = true
+axum.workspace = true
+reqwest.workspace = true
+clap.workspace = true
+uuid.workspace = true
+base64.workspace = true
+async-stream.workspace = true
+dirs.workspace = true
+libp2p.workspace = true
+libp2p-identity.workspace = true
+libp2p-stream.workspace = true

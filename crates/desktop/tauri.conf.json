@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "p2ptokens",
+  "version": "0.1.0",
+  "identifier": "com.p2ptokens.app",
+  "build": {
+    "frontendDist": "./dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "p2ptokens",
+        "width": 1040,
+        "height": 820,
+        "minWidth": 720,
+        "minHeight": 560,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Utility",
+    "shortDescription": "Distributed peer-to-peer network for LLM inference",
+    "longDescription": "p2ptokens is a distributed, decentralized, peer-to-peer network for LLM completions. Seed your spare GPU, leech inference from the swarm — no servers in the data path. Access is metered by an upload/download ratio, the seed/leech incentive model of the BitTorrent protocol."
+  }
+}

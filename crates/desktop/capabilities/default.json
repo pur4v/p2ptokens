@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Default capability for the p2ptokens desktop window",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

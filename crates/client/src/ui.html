@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>p2ptokens // swarm</title>
+<style>
+  :root {
+    --bg: #0b0f0b;
+    --panel: #0e140e;
+    --green: #33ff88;
+    --green-dim: #2ecc71;
+    --green-faint: #1c7a44;
+    --amber: #ffb000;
+    --red: #ff4d4d;
+    --fg: #9fe6bd;
+    --muted: #4f7a63;
+    --border: #1f5a3a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--fg);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px; line-height: 1.45;
+  }
+  body {
+    background-image: repeating-linear-gradient(0deg,
+      rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.10) 3px, rgba(0,0,0,0) 4px);
+    padding: 18px 14px 60px;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  a { color: var(--amber); }
+
+  .banner {
+    color: var(--green); white-space: pre; font-size: 12px; line-height: 1.15;
+    text-shadow: 0 0 6px rgba(51,255,136,0.35); overflow-x: auto; margin: 0 0 4px;
+  }
+  .tagline { color: var(--amber); margin: 0 0 14px; letter-spacing: 0.5px; font-size: 13px; }
+  .cursor { display: inline-block; color: var(--green); animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* tab bar + api target */
+  .tabrow { display: flex; align-items: flex-end; justify-content: space-between;
+    border-bottom: 1px solid var(--border); margin-bottom: 16px; gap: 8px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 2px; }
+  .tab { padding: 8px 20px; cursor: pointer; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px; font-weight: bold;
+    border: 1px solid transparent; border-bottom: none; background: transparent; }
+  .tab:hover { color: var(--green); }
+  .tab.active { color: var(--bg); background: var(--green-dim); }
+  .apitarget { color: var(--muted); font-size: 11px; padding: 4px 8px; align-self: center; }
+  .apitarget b { color: var(--green); }
+  .apitarget .dot { color: var(--green); }
+
+  /* panels */
+  .panel { border: 1px solid var(--border); background: var(--panel);
+    margin: 0 0 16px; box-shadow: inset 0 0 24px rgba(0,0,0,0.5); }
+  .panel-title { color: var(--bg); background: var(--green-dim); padding: 3px 10px;
+    font-weight: bold; letter-spacing: 2px; text-transform: uppercase;
+    display: flex; justify-content: space-between; align-items: center; }
+  .panel-title .aux { color: var(--bg); background: transparent; font-weight: bold; letter-spacing: 1px; }
+  .panel-body { padding: 12px 14px; }
+
+  .field { margin: 2px 0; }
+  .label { color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
+  .value { color: var(--green); word-break: break-all; }
+  .clickcopy { cursor: pointer; border-bottom: 1px dotted var(--green-faint); }
+  .clickcopy:hover { color: var(--amber); border-color: var(--amber); }
+  .copied { color: var(--amber); }
+
+  .addrs { list-style: none; margin: 6px 0 0; padding: 0; }
+  .addrs li { color: var(--fg); font-size: 12px; word-break: break-all; }
+  .addrs li::before { content: "└─ "; color: var(--green-faint); }
+
+  .node-grid { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
+  .ratio-box { text-align: center; border: 1px solid var(--border); padding: 8px 22px; min-width: 150px; }
+  .ratio-box .rlabel { color: var(--muted); font-size: 11px; letter-spacing: 2px; }
+  .ratio-num { font-size: 46px; line-height: 1; font-weight: bold; margin: 4px 0; text-shadow: 0 0 10px currentColor; }
+  .ratio-good { color: var(--green); } .ratio-warn { color: var(--amber); } .ratio-bad { color: var(--red); }
+  .counters { display: flex; gap: 26px; margin-top: 10px; flex-wrap: wrap; }
+  .counter .big { font-size: 20px; font-weight: bold; }
+  .up { color: var(--green); } .down { color: var(--amber); }
+  .rep-wrap { margin-top: 12px; max-width: 340px; }
+  .repbar { border: 1px solid var(--border); height: 14px; background: #061006; position: relative; overflow: hidden; }
+  .repbar > span { display: block; height: 100%;
+    background: repeating-linear-gradient(90deg, var(--green-dim) 0 6px, var(--green-faint) 6px 8px); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #12351f; }
+  th { color: var(--amber); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+  td { color: var(--green); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); font-style: italic; padding: 8px; }
+
+  /* form controls */
+  input[type=text], input[type=number], textarea, select {
+    background: #061006; color: var(--green); border: 1px solid var(--border);
+    padding: 7px 9px; font-family: inherit; font-size: 14px;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--green); }
+  input[type=number] { width: 4.5em; }
+  textarea { resize: vertical; }
+  ::placeholder { color: var(--muted); }
+  button { background: var(--green-dim); color: var(--bg); border: none; padding: 8px 20px;
+    font-family: inherit; font-size: 14px; font-weight: bold; letter-spacing: 1px; cursor: pointer; text-transform: uppercase; }
+  button:hover { background: var(--green); }
+  button:disabled { background: var(--green-faint); cursor: not-allowed; }
+  .btn-secondary { background: transparent; color: var(--amber); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: transparent; color: var(--green); border-color: var(--green); }
+
+  /* ---- chat ---- */
+  .chat-wrap { display: grid; grid-template-columns: 230px 1fr; gap: 16px; }
+  @media (max-width: 760px) { .chat-wrap { grid-template-columns: 1fr; } }
+  .convos-panel { border: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
+  .convos { list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 60vh; }
+  .convo { padding: 8px 10px; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid #12351f; }
+  .convo:hover { background: #0a130a; }
+  .convo.active { border-left-color: var(--green); background: #0a130a; }
+  .convo .ctitle { color: var(--fg); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .convo .cmeta { color: var(--muted); font-size: 10px; }
+  .convo .cdel { float: right; color: var(--muted); cursor: pointer; }
+  .convo .cdel:hover { color: var(--red); }
+  .convos-empty { color: var(--muted); font-style: italic; padding: 10px; font-size: 12px; }
+
+  .chat-main { border: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; min-height: 480px; }
+  .chat-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
+    padding: 8px 12px; border-bottom: 1px solid var(--border); background: #0a130a; }
+  .chat-head .chip { color: var(--muted); font-size: 11px; }
+  .chat-head .chip b { color: var(--green); }
+  .chat-head .grow { flex: 1; }
+  .chat-head select, .chat-head input { font-size: 12px; padding: 4px 6px; }
+  .msgs { flex: 1; overflow-y: auto; padding: 14px; max-height: 58vh; }
+  .msg { margin-bottom: 16px; }
+  .msg .who { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .msg.user .who { color: var(--amber); }
+  .msg.assistant .who { color: var(--green); }
+  .bubble { border: 1px solid var(--border); padding: 10px 12px; white-space: pre-wrap;
+    word-break: break-word; color: var(--fg); background: #061006; }
+  .msg.user .bubble { border-left: 3px solid var(--amber); }
+  .msg.assistant .bubble { border-left: 3px solid var(--green); }
+  .bubble.multi { margin-bottom: 6px; }
+  .bmeta { color: var(--muted); font-size: 11px; margin: 4px 0 0; }
+  .bmeta b { color: var(--amber); }
+  details.think { margin: 0 0 8px; }
+  details.think summary { color: var(--muted); cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  details.think .tbody { color: var(--muted); font-size: 12px; white-space: pre-wrap; border-left: 1px solid var(--border); padding-left: 10px; margin-top: 6px; }
+  .chat-empty { color: var(--muted); font-style: italic; text-align: center; margin-top: 40px; }
+  .chat-input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); align-items: flex-end; }
+  .chat-input textarea { flex: 1; min-height: 44px; max-height: 160px; }
+  .sendhint { color: var(--muted); font-size: 10px; }
+  .err { color: var(--red); }
+
+  .statusbar { margin-top: 6px; font-size: 12px; color: var(--muted);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .ok { color: var(--green); } .fail { color: var(--red); }
+  .foot { margin-top: 14px; color: var(--muted); font-size: 11px; text-align: center; letter-spacing: 0.5px; }
+  .foot a { color: var(--muted); } .foot a:hover { color: var(--green); }
+
+  /* ---- 18+ age gate overlay ---- */
+  .agegate { position: fixed; inset: 0; z-index: 9999; background: rgba(4,8,4,0.96);
+    background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.18) 3px, rgba(0,0,0,0) 4px);
+    display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
+  .agegate-panel { border: 1px solid var(--border); background: var(--panel);
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.6), 0 0 24px rgba(51,255,136,0.12); max-width: 520px; width: 100%; }
+  .agegate-panel .panel-title { font-size: 13px; }
+  .agegate-body { padding: 16px 18px; }
+  .agegate-body h2 { color: var(--green); text-transform: uppercase; letter-spacing: 2px; font-size: 18px; margin: 0 0 12px; text-shadow: 0 0 8px rgba(51,255,136,0.35); }
+  .agegate-body p { color: var(--fg); font-size: 13px; margin: 0 0 16px; }
+  .agegate-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .agegate-legal { color: var(--muted); font-size: 11px; letter-spacing: 0.5px; }
+
+  /* ---- cookie consent banner ---- */
+  .cookiebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9000;
+    border-top: 1px solid var(--border); background: var(--panel); box-shadow: 0 -4px 24px rgba(0,0,0,0.6);
+    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; }
+  .cookiebar .cookie-text { color: var(--fg); font-size: 12px; max-width: 620px; }
+  .cookiebar .cookie-text a { color: var(--amber); }
+  .cookie-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .cookie-actions button { padding: 6px 16px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <pre class="banner">▓▓▓▓   ▓▓▓  ▓▓▓▓     ▓▓▓▓▓  ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓  ▓▓▓▓
+▓   ▓ ▓   ▓ ▓   ▓      ▓   ▓   ▓ ▓  ▓  ▓     ▓▓  ▓ ▓
+▓▓▓▓     ▓  ▓▓▓▓       ▓   ▓   ▓ ▓▓▓   ▓▓▓▓  ▓ ▓ ▓  ▓▓▓
+▓       ▓   ▓          ▓   ▓   ▓ ▓  ▓  ▓     ▓  ▓▓     ▓
+▓     ▓▓▓▓▓ ▓          ▓    ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓ ▓▓▓▓</pre>
+  <p class="tagline">// distributed inference swarm — seed to leech // <span class="cursor">█</span></p>
+
+  <div class="tabrow">
+    <div class="tabs">
+      <button class="tab active" id="tab-btn-chat" data-tab="chat">Chat</button>
+      <button class="tab" id="tab-btn-network" data-tab="network">Network</button>
+    </div>
+    <div class="apitarget"><span class="dot">●</span> SWARM <b id="api-peers">0</b> peers · <b id="api-models">0</b> models</div>
+  </div>
+
+  <!-- ================= CHAT ================= -->
+  <section id="view-chat">
+    <div class="chat-wrap">
+      <div class="convos-panel">
+        <div class="panel-title"><span>┤ CHATS ├</span></div>
+        <ul class="convos" id="convos"></ul>
+        <div class="convos-empty" id="convos-empty">no conversations yet</div>
+        <div style="padding:8px; border-top:1px solid var(--border)">
+          <button type="button" id="new-chat" style="width:100%">+ NEW</button>
+        </div>
+      </div>
+
+      <div class="chat-main">
+        <div class="chat-head">
+          <span class="label">model</span>
+          <input type="text" id="chat-model" list="model-list" placeholder="llama3.1:8b" autocomplete="off" style="width:180px">
+          <datalist id="model-list"></datalist>
+          <span class="label">mode</span>
+          <select id="chat-mode">
+            <option value="single">single (stream)</option>
+            <option value="racing">racing</option>
+            <option value="quorum">quorum</option>
+            <option value="ensemble">ensemble</option>
+          </select>
+          <input type="number" id="chat-count" min="2" max="5" value="3" title="peers to fan out to">
+          <span class="grow"></span>
+          <span class="chip"><b id="chat-swarm">0</b> peers online</span>
+        </div>
+        <div class="msgs" id="msgs">
+          <div class="chat-empty" id="chat-empty">ask the swarm anything — a peer will serve your completion</div>
+        </div>
+        <div class="chat-input">
+          <textarea id="chat-prompt" placeholder="Ask me anything…  (Enter to send · Shift+Enter for newline)"></textarea>
+          <button type="button" id="chat-send">Send ▸</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= NETWORK ================= -->
+  <section id="view-network" style="display:none">
+    <div class="panel">
+      <div class="panel-title"><span>┤ THIS NODE ├</span><span class="aux" id="node-inflight">— / —</span></div>
+      <div class="panel-body">
+        <div class="node-grid">
+          <div>
+            <div class="field">
+              <span class="label">peer id</span><br>
+              <span class="value clickcopy" id="peer-id" title="click to copy full peer id">—</span>
+            </div>
+            <div class="field">
+              <span class="label">listen addrs</span>
+              <ul class="addrs" id="listen-addrs"><li>—</li></ul>
+            </div>
+          </div>
+          <div class="ratio-box">
+            <div class="rlabel">RATIO</div>
+            <div class="ratio-num ratio-good" id="ratio">—</div>
+            <div class="rlabel" id="ratio-hint">seed &gt; leech</div>
+          </div>
+        </div>
+        <div class="counters">
+          <div class="counter"><span class="label">up (served)</span><br><span class="big up">▲ <span id="served">—</span></span></div>
+          <div class="counter"><span class="label">down (consumed)</span><br><span class="big down">▼ <span id="consumed">—</span></span></div>
+          <div class="counter"><span class="label">capacity</span><br><span class="big" style="color:var(--green)"><span id="capacity">—</span> slots</span></div>
+        </div>
+        <div class="rep-wrap">
+          <span class="label">reputation — <span id="rep-pct">—</span></span>
+          <div class="repbar"><span id="rep-bar" style="width:0%"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>┤ SEEDING ├</span><span class="aux" id="offer-count">0 MODELS</span></div>
+      <div class="panel-body">
+        <table id="offers-table"><thead><tr><th>MODEL</th><th>BACKEND</th></tr></thead><tbody id="offers-body"></tbody></table>
+        <div class="empty" id="offers-empty" style="display:none">(no local backends — leech-only)</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>┤ SWARM ├</span><span class="aux" id="swarm-count">PEERS: 0</span></div>
+      <div class="panel-body">
+        <table id="swarm-table"><thead><tr><th>PEER</th><th>MODELS</th><th class="num">CAP</th><th class="num">ACTIVE</th></tr></thead><tbody id="swarm-body"></tbody></table>
+        <div class="empty" id="swarm-empty" style="display:none">(no seeders online)</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="statusbar">
+    <span id="conn-status" class="ok">◉ initializing…</span>
+    <span id="last-poll">—</span>
+  </div>
+  <div class="foot">
+    p2ptokens · <a href="https://p2ptokens.com" target="_blank" rel="noopener">p2ptokens.com</a> ·
+    <a href="https://github.com/pur4v/p2ptokens" target="_blank" rel="noopener">GitHub</a> ·
+    <a href="https://p2ptokens.com/privacy" target="_blank" rel="noopener">Privacy</a> ·
+    <a href="https://p2ptokens.com/terms" target="_blank" rel="noopener">Terms</a>
+  </div>
+
+</div>
+
+<!-- 18+ AGE GATE -->
+<div class="agegate" id="age-gate" style="display:none">
+  <div class="agegate-panel">
+    <div class="panel-title"><span>┤ RESTRICTED ├</span><span class="aux">18+</span></div>
+    <div class="agegate-body">
+      <h2>AGE VERIFICATION — 18+ <span class="cursor">█</span></h2>
+      <p>p2ptokens is intended only for users aged 18 or older. By entering, you confirm you are at least 18 years old (or the age of majority in your jurisdiction) and that you agree to the
+        <a href="https://p2ptokens.com/terms" target="_blank" rel="noopener">Terms of Service</a> and
+        <a href="https://p2ptokens.com/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+      <div class="agegate-actions">
+        <button type="button" id="age-enter">ENTER — I AM 18+</button>
+        <button type="button" id="age-leave" class="btn-secondary">LEAVE</button>
+      </div>
+      <div class="agegate-legal">// verification stored locally · non-sensitive workloads only — the serving peer sees your prompt</div>
+    </div>
+  </div>
+</div>
+
+<!-- COOKIE CONSENT -->
+<div class="cookiebar" id="cookie-bar" style="display:none">
+  <div class="cookie-text">We use strictly necessary local storage (age, cookie choices, your chat history — all kept in your browser). Optional analytics only with consent. <a href="https://p2ptokens.com/cookies" target="_blank" rel="noopener">Cookie Policy</a></div>
+  <div class="cookie-actions">
+    <button type="button" id="cookie-all">ACCEPT ALL</button>
+    <button type="button" id="cookie-essential" class="btn-secondary">ESSENTIAL ONLY</button>
+  </div>
+</div>
+
+<script>
+/* ---- 18+ age gate + cookie consent ---- */
+(function () {
+  "use strict";
+  var ageGate = document.getElementById("age-gate");
+  var cookieBar = document.getElementById("cookie-bar");
+  function maybeShowCookieBar() {
+    var c = null;
+    try { c = localStorage.getItem("p2p_cookie_consent"); } catch (e) {}
+    if ((c === null || c === "") && (!ageGate || ageGate.style.display === "none")) {
+      if (cookieBar) cookieBar.style.display = "flex";
+    }
+  }
+  function dismissCookieBar() { if (cookieBar) cookieBar.style.display = "none"; }
+  var ageAck = null;
+  try { ageAck = localStorage.getItem("p2p_age_ack"); } catch (e) {}
+  if (ageAck !== "1") { if (ageGate) ageGate.style.display = "flex"; } else { maybeShowCookieBar(); }
+  document.getElementById("age-enter").addEventListener("click", function () {
+    try { localStorage.setItem("p2p_age_ack", "1"); } catch (e) {}
+    if (ageGate) ageGate.style.display = "none";
+    maybeShowCookieBar();
+  });
+  document.getElementById("age-leave").addEventListener("click", function () { window.location.href = "about:blank"; });
+  document.getElementById("cookie-all").addEventListener("click", function () {
+    try { localStorage.setItem("p2p_cookie_consent", "all"); } catch (e) {} dismissCookieBar();
+  });
+  document.getElementById("cookie-essential").addEventListener("click", function () {
+    try { localStorage.setItem("p2p_cookie_consent", "essential"); } catch (e) {} dismissCookieBar();
+  });
+})();
+
+/* ---- main app ---- */
+(function () {
+  "use strict";
+  var fullPeerId = "";
+  function $(id) { return document.getElementById(id); }
+  function fmt(n) { if (n == null || isNaN(n)) return "—"; return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  function truncId(id) { if (!id) return "—"; return id.length <= 16 ? id : id.slice(0, 10) + "…" + id.slice(-4); }
+  function setText(id, t) { $(id).textContent = t; }
+  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+
+  /* ---------- tabs ---------- */
+  function showTab(name) {
+    $("view-chat").style.display = (name === "chat") ? "" : "none";
+    $("view-network").style.display = (name === "network") ? "" : "none";
+    $("tab-btn-chat").classList.toggle("active", name === "chat");
+    $("tab-btn-network").classList.toggle("active", name === "network");
+  }
+  $("tab-btn-chat").addEventListener("click", function () { showTab("chat"); });
+  $("tab-btn-network").addEventListener("click", function () { showTab("network"); });
+
+  /* ---------- copy peer id ---------- */
+  $("peer-id").addEventListener("click", function () {
+    if (!fullPeerId) return;
+    var el = $("peer-id"), restore = el.textContent;
+    function done() { el.classList.add("copied"); el.textContent = "copied ✓";
+      setTimeout(function () { el.classList.remove("copied"); el.textContent = restore; }, 900); }
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(fullPeerId).then(done, done); }
+    else { var ta = document.createElement("textarea"); ta.value = fullPeerId; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); } catch (e) {} document.body.removeChild(ta); done(); }
+  });
+
+  /* ---------- network render ---------- */
+  var knownModels = [];
+  function render(d) {
+    fullPeerId = d.peer_id || "";
+    var pe = $("peer-id"); pe.textContent = truncId(fullPeerId);
+    pe.title = fullPeerId ? ("click to copy: " + fullPeerId) : "";
+
+    var ul = $("listen-addrs"); ul.innerHTML = "";
+    var addrs = d.listen_addrs || [];
+    if (!addrs.length) { ul.innerHTML = "<li>(none)</li>"; }
+    else { addrs.forEach(function (a) { var li = document.createElement("li"); li.textContent = a; ul.appendChild(li); }); }
+
+    var r = d.ratio, rEl = $("ratio");
+    var isInf = (r === "inf" || r === Infinity || r === "Infinity");
+    var cls, hint;
+    if (isInf) { rEl.textContent = "∞"; cls = "ratio-good"; hint = "pure seeder"; }
+    else { var rv = Number(r); rEl.textContent = isNaN(rv) ? "—" : rv.toFixed(2);
+      if (rv >= 1) { cls = "ratio-good"; hint = "healthy seeder"; }
+      else if (rv >= 0.5) { cls = "ratio-warn"; hint = "seed more!"; }
+      else { cls = "ratio-bad"; hint = "leech — throttled"; } }
+    rEl.className = "ratio-num " + cls; setText("ratio-hint", hint);
+
+    setText("served", fmt(d.served)); setText("consumed", fmt(d.consumed));
+    setText("capacity", d.capacity == null ? "—" : d.capacity);
+    setText("node-inflight", (d.in_flight == null ? "—" : d.in_flight) + " / " + (d.capacity == null ? "—" : d.capacity) + " active");
+
+    var rep = Number(d.reputation); if (isNaN(rep)) rep = 0; rep = Math.max(0, Math.min(1, rep));
+    $("rep-bar").style.width = (rep * 100).toFixed(0) + "%"; setText("rep-pct", (rep * 100).toFixed(0) + "%");
+
+    var offers = d.offers || [], ob = $("offers-body"); ob.innerHTML = "";
+    setText("offer-count", offers.length + " MODEL" + (offers.length === 1 ? "" : "S"));
+    if (!offers.length) { $("offers-table").style.display = "none"; $("offers-empty").style.display = "block"; }
+    else { $("offers-table").style.display = ""; $("offers-empty").style.display = "none";
+      offers.forEach(function (o) { var tr = document.createElement("tr");
+        tr.innerHTML = "<td>" + esc(o.model) + "</td><td>" + esc(o.backend) + "</td>"; ob.appendChild(tr); }); }
+
+    var swarm = d.swarm || [];
+    var peers = (d.swarm_size == null ? swarm.length : d.swarm_size);
+    setText("swarm-count", "PEERS: " + peers);
+    setText("api-peers", peers); setText("chat-swarm", peers);
+    var sb = $("swarm-body"); sb.innerHTML = "";
+    if (!swarm.length) { $("swarm-table").style.display = "none"; $("swarm-empty").style.display = "block"; }
+    else { $("swarm-table").style.display = ""; $("swarm-empty").style.display = "none";
+      swarm.forEach(function (p) { var models = (p.models || []).join(", "); var tr = document.createElement("tr");
+        tr.innerHTML = "<td title=\"" + esc(p.peer_id) + "\">" + esc(truncId(p.peer_id)) + "</td>" +
+          "<td>" + esc(models || "—") + "</td>" +
+          "<td class=\"num\">" + (p.capacity == null ? "—" : p.capacity) + "</td>" +
+          "<td class=\"num\">" + (p.in_flight == null ? "—" : p.in_flight) + "</td>"; sb.appendChild(tr); }); }
+
+    // model list for chat (network-wide)
+    var set = {};
+    swarm.forEach(function (p) { (p.models || []).forEach(function (m) { set[m] = 1; }); });
+    offers.forEach(function (o) { set[o.model] = 1; });
+    knownModels = Object.keys(set).sort();
+    setText("api-models", knownModels.length);
+    var dl = $("model-list"); dl.innerHTML = "";
+    knownModels.forEach(function (m) { var opt = document.createElement("option"); opt.value = m; dl.appendChild(opt); });
+    if (!$("chat-model").value && knownModels.length) $("chat-model").placeholder = knownModels[0];
+  }
+
+  function setConn(ok, msg) {
+    var el = $("conn-status");
+    if (ok) { el.className = "ok"; el.textContent = "◉ " + (msg || "connected — polling /api/status"); }
+    else { el.className = "fail"; el.textContent = "✕ " + (msg || "coordinator/daemon unreachable — retrying"); }
+  }
+  function poll() {
+    fetch("/api/status", { cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function (d) { render(d); setConn(true); setText("last-poll", "last poll " + new Date().toLocaleTimeString()); })
+      .catch(function (e) { setConn(false, "coordinator/daemon unreachable — retrying (" + e.message + ")"); });
+  }
+
+  /* ---------- conversations (localStorage) ---------- */
+  var CONVO_KEY = "p2p_convos";
+  var convos = [];
+  var currentId = null;
+  try { convos = JSON.parse(localStorage.getItem(CONVO_KEY) || "[]") || []; } catch (e) { convos = []; }
+  function saveConvos() { try { localStorage.setItem(CONVO_KEY, JSON.stringify(convos)); } catch (e) {} }
+  function current() { return convos.filter(function (c) { return c.id === currentId; })[0] || null; }
+  function newConvo() {
+    var c = { id: "c" + Date.now(), title: "new chat", created: Date.now(), messages: [] };
+    convos.unshift(c); currentId = c.id; saveConvos(); renderConvos(); renderThread();
+  }
+  function deleteConvo(id) {
+    convos = convos.filter(function (c) { return c.id !== id; });
+    if (currentId === id) currentId = convos.length ? convos[0].id : null;
+    saveConvos(); renderConvos(); renderThread();
+  }
+  function renderConvos() {
+    var ul = $("convos"); ul.innerHTML = "";
+    $("convos-empty").style.display = convos.length ? "none" : "block";
+    convos.forEach(function (c) {
+      var li = document.createElement("li");
+      li.className = "convo" + (c.id === currentId ? " active" : "");
+      li.innerHTML = "<span class=\"cdel\" title=\"delete\">✕</span>" +
+        "<div class=\"ctitle\">" + esc(c.title || "chat") + "</div>" +
+        "<div class=\"cmeta\">" + (c.messages.length) + " msg · " + new Date(c.created).toLocaleString() + "</div>";
+      li.addEventListener("click", function () { currentId = c.id; renderConvos(); renderThread(); });
+      li.querySelector(".cdel").addEventListener("click", function (ev) { ev.stopPropagation(); deleteConvo(c.id); });
+      ul.appendChild(li);
+    });
+  }
+  // split a <think>...</think> block out of assistant content
+  function splitThink(text) {
+    var m = /^\s*<think>([\s\S]*?)<\/think>\s*/i.exec(text || "");
+    if (m) return { think: m[1].trim(), body: text.slice(m[0].length) };
+    return { think: null, body: text || "" };
+  }
+  function bubbleHtml(content, provider, extraMeta) {
+    var parts = splitThink(content);
+    var html = "";
+    if (parts.think) {
+      html += "<details class=\"think\"><summary>⟨ thinking ⟩</summary><div class=\"tbody\">" + esc(parts.think) + "</div></details>";
+    }
+    html += "<div class=\"bubble" + (extraMeta ? " multi" : "") + "\">" + esc(parts.body || "…") + "</div>";
+    var meta = [];
+    if (provider) meta.push("served by <b title=\"" + esc(provider) + "\">" + esc(truncId(provider)) + "</b>");
+    if (extraMeta) meta.push(extraMeta);
+    if (meta.length) html += "<div class=\"bmeta\">◄ " + meta.join(" · ") + "</div>";
+    return html;
+  }
+  function renderThread() {
+    var box = $("msgs"); box.innerHTML = "";
+    var c = current();
+    if (!c || !c.messages.length) {
+      box.innerHTML = "<div class=\"chat-empty\" id=\"chat-empty\">ask the swarm anything — a peer will serve your completion</div>";
+      return;
+    }
+    c.messages.forEach(function (m) {
+      var div = document.createElement("div");
+      div.className = "msg " + (m.role === "user" ? "user" : "assistant");
+      var who = m.role === "user" ? "You" : "Assistant";
+      var inner = "<div class=\"who\">" + who + "</div>";
+      if (m.role === "assistant" && m.choices && m.choices.length > 1) {
+        // ensemble: multiple provider answers
+        m.choices.forEach(function (ch, i) {
+          inner += "<div class=\"label\" style=\"margin-top:6px\">choice " + (i + 1) + "</div>" + bubbleHtml(ch.content, ch.provider, null);
+        });
+        if (m.meta) inner += "<div class=\"bmeta\">⇄ " + m.meta + "</div>";
+      } else {
+        inner += bubbleHtml(m.content, m.provider, m.meta);
+      }
+      div.innerHTML = inner;
+      box.appendChild(div);
+    });
+    box.scrollTop = box.scrollHeight;
+  }
+
+  /* ---------- sending ---------- */
+  var sending = false;
+  function scrollMsgs() { var b = $("msgs"); b.scrollTop = b.scrollHeight; }
+
+  async function streamSingle(model, messages, liveEl) {
+    var r = await fetch("/v1/chat/completions", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: model, messages: messages, stream: true })
+    });
+    if (!r.ok || !r.body) { var j = await r.json().catch(function () { return {}; });
+      throw new Error((j.error && j.error.message) || ("HTTP " + r.status)); }
+    var reader = r.body.getReader(), dec = new TextDecoder(), buf = "", acc = "";
+    while (true) {
+      var res = await reader.read(); if (res.done) break;
+      buf += dec.decode(res.value, { stream: true });
+      var idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        var line = buf.slice(0, idx).trim(); buf = buf.slice(idx + 2);
+        if (!line.indexOf("data:") === 0 && line.indexOf("data:") !== 0) continue;
+        if (line.indexOf("data:") !== 0) continue;
+        var data = line.slice(5).trim();
+        if (data === "[DONE]") return acc;
+        try { var o = JSON.parse(data);
+          if (o.error) throw new Error(o.error.message || "stream error");
+          var d = o.choices && o.choices[0] && o.choices[0].delta;
+          if (d && d.content) { acc += d.content; liveEl.innerHTML = esc(acc); scrollMsgs(); }
+        } catch (e) { if (e instanceof Error && /stream error/.test(e.message)) throw e; }
+      }
+    }
+    return acc;
+  }
+
+  async function send() {
+    if (sending) return;
+    var text = $("chat-prompt").value.trim();
+    if (!text) return;
+    var model = $("chat-model").value.trim() || $("chat-model").placeholder || "llama3.1:8b";
+    var mode = $("chat-mode").value;
+    var count = parseInt($("chat-count").value, 10) || 3;
+
+    if (!current()) newConvo();
+    var c = current();
+    c.messages.push({ role: "user", content: text });
+    if (c.messages.length === 1 || c.title === "new chat") c.title = text.slice(0, 40);
+    $("chat-prompt").value = "";
+    saveConvos(); renderConvos(); renderThread();
+
+    // history for context: role/content only
+    var history = c.messages.map(function (m) { return { role: m.role, content: m.content }; });
+
+    sending = true; $("chat-send").disabled = true;
+    // placeholder assistant bubble
+    var box = $("msgs");
+    var holder = document.createElement("div");
+    holder.className = "msg assistant";
+    holder.innerHTML = "<div class=\"who\">Assistant · " + esc(mode) + "</div><div class=\"bubble\" id=\"live-bubble\">…requesting from the swarm…</div>";
+    box.appendChild(holder); scrollMsgs();
+    var live = $("live-bubble");
+
+    try {
+      if (mode === "single") {
+        var acc = await streamSingle(model, history, live);
+        c.messages.push({ role: "assistant", content: acc || "(no content)" });
+      } else {
+        var r = await fetch("/v1/chat/completions", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: model, messages: history, fanout: mode, fanout_count: count })
+        });
+        var j = await r.json();
+        if (!r.ok || j.error) throw new Error((j.error && j.error.message) || ("HTTP " + r.status));
+        var choices = (j.choices || []).map(function (ch) {
+          return { content: (ch.message && ch.message.content) || "", provider: ch.p2p_provider || (j.p2p_provider || "") };
+        });
+        var meta = "";
+        if (j.p2p_fanout) { var f = j.p2p_fanout;
+          meta = "mode <b>" + esc(f.mode) + "</b> · <b>" + f.responded + "</b> peer(s)";
+          if (f.agreement != null) meta += " · <b>" + f.agreement + "</b> agreed"; }
+        if (mode === "ensemble") {
+          c.messages.push({ role: "assistant", content: choices[0] ? choices[0].content : "", choices: choices, meta: meta });
+        } else {
+          var ch0 = choices[0] || { content: "(no content)", provider: "" };
+          c.messages.push({ role: "assistant", content: ch0.content, provider: ch0.provider, meta: meta });
+        }
+      }
+      saveConvos(); renderThread();
+    } catch (e) {
+      live.className = "bubble"; live.innerHTML = "<span class=\"err\">✕ " + esc(e.message || "request failed") + "</span>";
+      // keep the user turn; drop the failed assistant turn from storage
+      saveConvos();
+    } finally {
+      sending = false; $("chat-send").disabled = false; renderConvos();
+    }
+  }
+
+  $("chat-send").addEventListener("click", send);
+  $("chat-prompt").addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); send(); }
+  });
+  $("new-chat").addEventListener("click", newConvo);
+
+  // init
+  if (convos.length) currentId = convos[0].id;
+  renderConvos(); renderThread();
+  poll(); setInterval(poll, 2000);
+})();
+</script>
+</body>
+</html>

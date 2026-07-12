@@ -1,0 +1,16 @@
+# Rust build output
+/target
+
+# backups / logs / env
+**/*.rs.bk
+*.log
+.env
+.env.*
+.DS_Store
+
+# local runtime data (identity keypairs, per-run dirs)
+/.p2ptokens/
+/.p2p/
+
+# tauri generated files
+/crates/desktop/gen/

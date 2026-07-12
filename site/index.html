@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>p2ptokens // distributed peer-to-peer LLM inference</title>
+<meta name="description" content="p2ptokens is a distributed, peer-to-peer, decentralized network for LLM inference. Seed completions from your local model, leech from peers, metered by an upload/download ratio — the seed/leech incentive model of the BitTorrent protocol. No money, pure barter.">
+<meta name="keywords" content="distributed LLM inference, peer-to-peer, P2P, decentralized, BitTorrent protocol, seed, leech, ratio, OpenAI-compatible, Ollama, libp2p">
+<style>
+  :root {
+    --bg: #0b0f0b;
+    --panel: #0e140e;
+    --green: #33ff88;
+    --green-dim: #2ecc71;
+    --green-faint: #1c7a44;
+    --amber: #ffb000;
+    --red: #ff4d4d;
+    --fg: #9fe6bd;
+    --muted: #4f7a63;
+    --border: #1f5a3a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  body {
+    /* subtle scanline feel, very light */
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0) 0px,
+      rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.10) 3px,
+      rgba(0,0,0,0) 4px
+    );
+    padding: 18px 14px 40px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  a { color: var(--amber); }
+  a:hover { color: var(--green); }
+
+  /* ---- hero ---- */
+  header { text-align: center; margin: 12px 0 28px; }
+  .banner {
+    color: var(--green);
+    white-space: pre;
+    font-size: 12px;
+    line-height: 1.15;
+    text-shadow: 0 0 6px rgba(51,255,136,0.35);
+    overflow-x: auto;
+    margin: 0 auto 10px;
+    display: inline-block;
+    text-align: left;
+  }
+  .tagline {
+    color: var(--amber);
+    margin: 0 0 6px;
+    letter-spacing: 0.5px;
+    font-size: 15px;
+    font-weight: bold;
+  }
+  .pitch {
+    color: var(--fg);
+    margin: 0 auto 22px;
+    max-width: 620px;
+    font-size: 13px;
+  }
+  .cursor {
+    display: inline-block;
+    color: var(--green);
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; align-items: center; }
+  .btn {
+    display: inline-block;
+    background: var(--green-dim);
+    color: var(--bg);
+    border: 1px solid var(--green-dim);
+    padding: 11px 26px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+  .btn:hover { background: var(--green); border-color: var(--green); color: var(--bg); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--amber);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: transparent; color: var(--green); border-color: var(--green); }
+  .btn-sub { display: block; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .btn-sub a { color: var(--muted); text-decoration: underline; }
+
+  /* ---- panels ---- */
+  section { margin: 0 0 18px; }
+  .panel {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.5);
+  }
+  .panel-title {
+    color: var(--bg);
+    background: var(--green-dim);
+    padding: 3px 10px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .panel-title .aux { color: var(--bg); background: transparent; font-weight: bold; letter-spacing: 1px; }
+  .panel-body { padding: 14px 16px; }
+
+  /* ---- how it works ---- */
+  ol.steps { list-style: none; counter-reset: step; margin: 0; padding: 0; }
+  ol.steps > li {
+    counter-increment: step;
+    position: relative;
+    padding: 8px 0 8px 44px;
+    border-bottom: 1px solid #12351f;
+  }
+  ol.steps > li:last-child { border-bottom: none; }
+  ol.steps > li::before {
+    content: "0" counter(step);
+    position: absolute;
+    left: 0; top: 8px;
+    color: var(--amber);
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+  ol.steps b { color: var(--green); }
+  .diagram {
+    color: var(--fg);
+    white-space: pre;
+    font-size: 12px;
+    line-height: 1.3;
+    overflow-x: auto;
+    margin: 14px 0 4px;
+    border: 1px solid var(--border);
+    background: #061006;
+    padding: 12px;
+  }
+  .diagram .hl-green { color: var(--green); }
+  .diagram .hl-amber { color: var(--amber); }
+  .diag-note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+
+  /* ---- features grid ---- */
+  .feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .feat {
+    border: 1px solid var(--border);
+    background: #061006;
+    padding: 12px 14px;
+  }
+  .feat h3 {
+    color: var(--green);
+    margin: 0 0 6px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .feat h3::before { content: "▓ "; color: var(--green-faint); }
+  .feat p { margin: 0; color: var(--fg); font-size: 12.5px; }
+
+  /* ---- honesty note ---- */
+  .note {
+    border: 1px solid var(--amber);
+    background: rgba(255,176,0,0.06);
+  }
+  .note .panel-title { background: var(--amber); }
+  .note .panel-body { color: var(--fg); font-size: 13px; }
+  .note b { color: var(--amber); }
+
+  /* ---- footer ---- */
+  footer { margin-top: 26px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .foot-cols { display: flex; flex-wrap: wrap; gap: 24px 48px; }
+  .foot-col h4 {
+    color: var(--muted);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin: 0 0 8px;
+  }
+  .foot-col ul { list-style: none; margin: 0; padding: 0; }
+  .foot-col li { margin: 3px 0; font-size: 12.5px; }
+  .foot-col li::before { content: "└─ "; color: var(--green-faint); }
+  .foot-status { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); display: inline-block; }
+  .foot-legal {
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* ---- 18+ age gate overlay ---- */
+  .agegate {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(4, 8, 4, 0.96);
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0) 0px,
+      rgba(0,0,0,0) 2px,
+      rgba(0,0,0,0.18) 3px,
+      rgba(0,0,0,0) 4px
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .agegate-panel {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.6), 0 0 24px rgba(51,255,136,0.12);
+    max-width: 520px;
+    width: 100%;
+  }
+  .agegate-panel .panel-title { font-size: 13px; }
+  .agegate-body { padding: 16px 18px; }
+  .agegate-body h2 {
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 18px;
+    margin: 0 0 12px;
+    text-shadow: 0 0 8px rgba(51,255,136,0.35);
+  }
+  .agegate-body p { color: var(--fg); font-size: 13px; margin: 0 0 16px; }
+  .agegate-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .btn-secondary {
+    background: transparent;
+    color: var(--amber);
+    border: 1px solid var(--border);
+    padding: 8px 20px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .btn-secondary:hover { background: transparent; color: var(--green); border-color: var(--green); }
+  #age-enter {
+    background: var(--green-dim);
+    color: var(--bg);
+    border: none;
+    padding: 8px 20px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  #age-enter:hover { background: var(--green); }
+  .agegate-legal { color: var(--muted); font-size: 11px; letter-spacing: 0.5px; }
+
+  /* ---- cookie consent banner ---- */
+  .cookiebar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 9000;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.6);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 20px;
+    flex-wrap: wrap;
+  }
+  .cookiebar .cookie-text { color: var(--fg); font-size: 12px; max-width: 620px; }
+  .cookiebar .cookie-text a { color: var(--amber); }
+  .cookie-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .cookie-actions button { padding: 6px 16px; font-size: 12px; }
+  .cookie-actions .btn-primary {
+    background: var(--green-dim); color: var(--bg); border: none;
+    font-family: inherit; font-weight: bold; letter-spacing: 1px; cursor: pointer; text-transform: uppercase;
+  }
+  .cookie-actions .btn-primary:hover { background: var(--green); }
+
+  /* ---- responsive ---- */
+  @media (max-width: 620px) {
+    .banner { font-size: 9px; }
+    .feat-grid { grid-template-columns: 1fr; }
+    .tagline { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 1. HERO -->
+  <header>
+    <pre class="banner" role="img" aria-label="P2P TOKENS">▓▓▓▓   ▓▓▓  ▓▓▓▓     ▓▓▓▓▓  ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓  ▓▓▓▓
+▓   ▓ ▓   ▓ ▓   ▓      ▓   ▓   ▓ ▓  ▓  ▓     ▓▓  ▓ ▓
+▓▓▓▓     ▓  ▓▓▓▓       ▓   ▓   ▓ ▓▓▓   ▓▓▓▓  ▓ ▓ ▓  ▓▓▓
+▓       ▓   ▓          ▓   ▓   ▓ ▓  ▓  ▓     ▓  ▓▓     ▓
+▓     ▓▓▓▓▓ ▓          ▓    ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓ ▓▓▓▓</pre>
+    <p class="tagline">// distributed · peer-to-peer · decentralized LLM inference — seed tokens, leech tokens, no middleman <span class="cursor">█</span></p>
+    <p class="pitch">One app that <b>seeds</b> completions from your local model and <b>leeches</b> completions from peers, gated by a no-free-lunch upload/download ratio — the seed/leech incentive model of the <b>BitTorrent protocol</b>, applied to inference. A central coordinator brokers matches, but the inference bytes flow <b>peer-to-peer</b>. No money in v1: pure barter.</p>
+    <div class="cta">
+      <!-- OS-detected primary download. TODO: point href at real GitHub release assets -->
+      <a class="btn" id="download-btn" href="#download" aria-label="Download p2ptokens">↓ Download</a>
+      <a class="btn btn-ghost" href="https://github.com/pur4v/p2ptokens" rel="noopener">★ GitHub</a>
+    </div>
+    <span class="btn-sub">Cross-platform desktop app (Tauri) + CLI · Rust · <a id="download-alt" href="https://p2ptokens.com/download" rel="noopener">all downloads</a></span>
+  </header>
+
+  <!-- 2. HOW IT WORKS -->
+  <section class="panel" aria-labelledby="how-title">
+    <div class="panel-title"><span id="how-title">┤ HOW IT WORKS ├</span><span class="aux">4 STEPS</span></div>
+    <div class="panel-body">
+      <ol class="steps">
+        <li><b>Install &amp; run.</b> One binary. Point it at a local model backend — Ollama, any OpenAI-compatible endpoint, or Claude.</li>
+        <li><b>It seeds automatically.</b> Your node advertises the models it can serve and starts answering peer requests, earning upload credit.</li>
+        <li><b>Get matched.</b> When you need a completion, the coordinator finds a seeder with that model. It only brokers the match — it never sees your prompt.</li>
+        <li><b>Use the shared endpoint.</b> Point any tool at your local OpenAI-compatible <b>/v1/chat/completions</b>; the tokens stream straight from a peer.</li>
+      </ol>
+
+      <pre class="diagram" role="img" aria-label="Diagram: your app requests a match from the coordinator, then streams inference peer-to-peer from a seeder">   YOU (leech)              COORDINATOR              PEER (seeder)
+  ┌───────────┐   1. match?  ┌───────────┐          ┌───────────┐
+  │  /v1/chat │─────────────▶│  tracker  │          │  ollama / │
+  │  local    │◀─────────────│  registry │          │  openai / │
+  │  endpoint │  2. peer=X   │  + ratio  │          │  claude   │
+  └─────┬─────┘              └───────────┘          └─────┬─────┘
+        │                                                 │
+        │     <span class="hl-green">3. P2P inference stream (bytes never touch coordinator)</span>
+        └────────────────────────────────────────────────┘
+                     <span class="hl-amber">ratio: seed ▲  ·  leech ▼</span></pre>
+      <p class="diag-note">NAT hole-punching is automatic — peers connect directly even behind home routers.</p>
+    </div>
+  </section>
+
+  <!-- 3. WHY / FEATURES -->
+  <section class="panel" aria-labelledby="why-title">
+    <div class="panel-title"><span id="why-title">┤ WHY P2PTOKENS ├</span></div>
+    <div class="panel-body">
+      <div class="feat-grid">
+        <div class="feat">
+          <h3>Content-blind coordinator</h3>
+          <p>The tracker only brokers matches and keeps the ratio ledger. It never sees your prompts or completions.</p>
+        </div>
+        <div class="feat">
+          <h3>Peer-to-peer data path</h3>
+          <p>Inference bytes stream directly between you and the seeder — encrypted in transit, no central relay.</p>
+        </div>
+        <div class="feat">
+          <h3>Barter ratio, no money</h3>
+          <p>Earn upload credit by seeding, spend it by leeching. v1 is pure barter — no wallets, no fees, no tokens-for-sale.</p>
+        </div>
+        <div class="feat">
+          <h3>NAT hole-punching just works</h3>
+          <p>Direct peer connections form automatically behind typical home and office NATs. No port-forwarding.</p>
+        </div>
+        <div class="feat">
+          <h3>Bring your own model</h3>
+          <p>Serve from Ollama, any OpenAI-compatible endpoint, or Claude. Seed what you already run.</p>
+        </div>
+        <div class="feat">
+          <h3>OpenAI-compatible</h3>
+          <p>Exposes a local <b>/v1/chat/completions</b>. Drop it into existing tools and SDKs unchanged.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. HONESTY NOTE -->
+  <section class="panel note" aria-labelledby="honest-title">
+    <div class="panel-title"><span id="honest-title">┤ HONEST NOTE — READ THIS ├</span><span class="aux">V1</span></div>
+    <div class="panel-body">
+      <p style="margin-top:0">v1 is for <b>non-sensitive workloads only.</b> The peer serving your request sees your prompt in <b>plaintext</b> — traffic is encrypted in transit and the coordinator is content-blind, but the seeding node is not. There is <b>no trusted execution (TEE) yet</b>. Don't send anything you wouldn't hand to a stranger. Confidential-compute is on the roadmap, not shipped.</p>
+    </div>
+  </section>
+
+  <!-- 5. FOOTER -->
+  <footer>
+    <div class="foot-cols">
+      <div class="foot-col">
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/pur4v/p2ptokens" rel="noopener">GitHub</a></li>
+          <li><a href="https://p2ptokens.com/download" rel="noopener">Downloads</a></li>
+          <li><span class="foot-status"><span class="dot" aria-hidden="true"></span> <a href="https://p2ptokens.com/status" title="Coordinator status">Coordinator status</a></span> <!-- TODO: real status URL --></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Legal</h4>
+        <ul>
+          <!-- TODO: if hosted standalone, point these at rendered HTML; sources live in legal/*.md -->
+          <li><a href="https://p2ptokens.com/privacy" rel="noopener">Privacy Policy</a></li>
+          <li><a href="https://p2ptokens.com/terms" rel="noopener">Terms of Service</a></li>
+          <li><a href="https://p2ptokens.com/acceptable-use" rel="noopener">Acceptable Use</a></li>
+          <li><a href="https://p2ptokens.com/cookies" rel="noopener">Cookie Policy</a></li>
+        </ul>
+      </div>
+      <div class="foot-col">
+        <h4>Get started</h4>
+        <ul>
+          <li><a href="#download" id="download-foot">Download the app</a></li>
+          <li><a href="https://github.com/pur4v/p2ptokens#readme" rel="noopener">Docs / README</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-legal">
+      <span>© <span id="year">2026</span> p2ptokens · p2ptokens.com · Inference, shared.</span>
+      <span>18+ only · non-sensitive workloads · no money in v1</span>
+    </div>
+    <div class="foot-legal" style="margin-top:8px">
+      <span>&ldquo;BitTorrent&rdquo; is a trademark of its respective owner. p2ptokens is an independent, unaffiliated project; references describe the peer-to-peer <b>BitTorrent protocol</b> technique, not the product.</span>
+    </div>
+  </footer>
+
+</div>
+
+<!-- 18+ AGE GATE -->
+<div class="agegate" id="age-gate" style="display:none" role="dialog" aria-modal="true" aria-labelledby="agegate-h">
+  <div class="agegate-panel">
+    <div class="panel-title"><span>┤ RESTRICTED ├</span><span class="aux">18+</span></div>
+    <div class="agegate-body">
+      <h2 id="agegate-h">AGE VERIFICATION — 18+ <span class="cursor">█</span></h2>
+      <p>p2ptokens is intended only for users aged 18 or older. By entering, you confirm you are at least 18 years old (or the age of majority in your jurisdiction) and that you agree to the
+        <a href="https://p2ptokens.com/terms" rel="noopener">Terms of Service</a> and
+        <a href="https://p2ptokens.com/privacy" rel="noopener">Privacy Policy</a>.</p>
+      <div class="agegate-actions">
+        <button type="button" id="age-enter">ENTER — I AM 18+</button>
+        <button type="button" id="age-leave" class="btn-secondary">LEAVE</button>
+      </div>
+      <div class="agegate-legal">// verification stored locally · non-sensitive workloads only in v1</div>
+    </div>
+  </div>
+</div>
+
+<!-- COOKIE CONSENT -->
+<div class="cookiebar" id="cookie-bar" style="display:none" role="region" aria-label="Cookie consent">
+  <div class="cookie-text">We use strictly necessary local storage (age + cookie choices). Optional analytics only with your consent. <a href="https://p2ptokens.com/cookies" rel="noopener">Cookie Policy</a></div>
+  <div class="cookie-actions">
+    <button type="button" id="cookie-all" class="btn-primary">ACCEPT ALL</button>
+    <button type="button" id="cookie-essential" class="btn-secondary">ESSENTIAL ONLY</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- 18+ age gate + cookie consent (same localStorage keys as the app UI) ----
+  var ageGate = document.getElementById("age-gate");
+  var cookieBar = document.getElementById("cookie-bar");
+
+  function maybeShowCookieBar() {
+    var c = null;
+    try { c = localStorage.getItem("p2p_cookie_consent"); } catch (e) {}
+    // only when no choice recorded AND the age gate is not up
+    if ((c === null || c === "") && (!ageGate || ageGate.style.display === "none")) {
+      if (cookieBar) cookieBar.style.display = "flex";
+    }
+  }
+  function dismissCookieBar() {
+    if (cookieBar) cookieBar.style.display = "none";
+  }
+
+  var ageAck = null;
+  try { ageAck = localStorage.getItem("p2p_age_ack"); } catch (e) {}
+  if (ageAck !== "1") {
+    if (ageGate) ageGate.style.display = "flex";
+  } else {
+    maybeShowCookieBar();
+  }
+
+  document.getElementById("age-enter").addEventListener("click", function () {
+    try { localStorage.setItem("p2p_age_ack", "1"); } catch (e) {}
+    if (ageGate) ageGate.style.display = "none";
+    maybeShowCookieBar();
+  });
+  document.getElementById("age-leave").addEventListener("click", function () {
+    window.location.href = "about:blank";
+  });
+  document.getElementById("cookie-all").addEventListener("click", function () {
+    try { localStorage.setItem("p2p_cookie_consent", "all"); } catch (e) {}
+    dismissCookieBar();
+  });
+  document.getElementById("cookie-essential").addEventListener("click", function () {
+    try { localStorage.setItem("p2p_cookie_consent", "essential"); } catch (e) {}
+    dismissCookieBar();
+  });
+})();
+
+(function () {
+  "use strict";
+
+  // ---- current year ----
+  try { document.getElementById("year").textContent = new Date().getFullYear(); } catch (e) {}
+
+  // ---- OS auto-detection for the Download button ----
+  // Labels the primary button per-OS. TODO: swap hrefs for real GitHub release assets.
+  var RELEASES = "https://p2ptokens.com/download/latest";
+  function detectOS() {
+    var ua = (navigator.userAgent || "") + " " + (navigator.platform || "");
+    var uaLower = ua.toLowerCase();
+    // navigator.userAgentData is the modern hint; fall back to UA string.
+    var plat = (navigator.userAgentData && navigator.userAgentData.platform) || "";
+    var p = (plat + " " + ua).toLowerCase();
+    if (/iphone|ipad|ipod/.test(uaLower)) return "iOS";
+    if (/android/.test(uaLower)) return "Android";
+    if (/mac|darwin|os x/.test(p)) return "macOS";
+    if (/win/.test(p)) return "Windows";
+    if (/linux|x11/.test(p)) return "Linux";
+    return null;
+  }
+
+  var os = detectOS();
+  var btn = document.getElementById("download-btn");
+  var label;
+  // TODO: map each OS to its specific release asset URL once releases are published.
+  if (os === "macOS")       { label = "↓ Download for macOS"; }
+  else if (os === "Windows"){ label = "↓ Download for Windows"; }
+  else if (os === "Linux")  { label = "↓ Download for Linux"; }
+  else if (os === "iOS" || os === "Android") { label = "↓ Get the desktop app"; }
+  else                      { label = "↓ Download"; }
+
+  if (btn) {
+    btn.textContent = label;
+    btn.setAttribute("href", RELEASES);
+    btn.setAttribute("data-os", os || "unknown");
+    btn.setAttribute("aria-label", label + (os ? "" : " — pick your platform"));
+  }
+})();
+</script>
+</body>
+</html>

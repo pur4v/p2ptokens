@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="P2P TOKENS">
+  <defs>
+    <filter id="g" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#0b0f0b"/>
+  <rect x="8" y="8" width="496" height="496" rx="90" fill="none" stroke="#1f5a3a" stroke-width="4"/>
+  <text x="256" y="250" text-anchor="middle"
+        font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+        font-size="185" font-weight="700" letter-spacing="4"
+        fill="#33ff88" filter="url(#g)">P2P</text>
+  <text x="256" y="340" text-anchor="middle"
+        font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+        font-size="66" font-weight="700" letter-spacing="10" fill="#ffb000">TOKENS</text>
+  <text x="256" y="410" text-anchor="middle"
+        font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+        font-size="26" letter-spacing="2" fill="#4f7a63">seed · leech · P2P</text>
+</svg>

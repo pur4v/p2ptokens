@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>p2ptokens</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0f0b; color: #9fe6bd;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .wrap { height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; }
+  .g { color: #33ff88; text-shadow: 0 0 8px rgba(51,255,136,.35); }
+  .a { color: #ffb000; }
+  pre { margin: 0 0 10px; font-size: 13px; line-height: 1.2; }
+  .cursor { display:inline-block; color:#33ff88; animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <pre class="g">▓▓▓▓   ▓▓▓  ▓▓▓▓     ▓▓▓▓▓  ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓  ▓▓▓▓
+▓   ▓ ▓   ▓ ▓   ▓      ▓   ▓   ▓ ▓  ▓  ▓     ▓▓  ▓ ▓
+▓▓▓▓     ▓  ▓▓▓▓       ▓   ▓   ▓ ▓▓▓   ▓▓▓▓  ▓ ▓ ▓  ▓▓▓
+▓       ▓   ▓          ▓   ▓   ▓ ▓  ▓  ▓     ▓  ▓▓     ▓
+▓     ▓▓▓▓▓ ▓          ▓    ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓ ▓▓▓▓</pre>
+      <p>starting the swarm client <span class="cursor">█</span></p>
+      <p class="a" id="s">booting local daemon…</p>
+    </div>
+  </div>
+  <script>
+    // The embedded daemon serves the real dashboard on this port. Poll until it
+    // is up, then hand the window over to it (same origin → all APIs work).
+    const URL = "http://127.0.0.1:8787";
+    const status = document.getElementById("s");
+    async function ping() {
+      try {
+        await fetch(URL + "/api/status", { mode: "no-cors" });
+        location.replace(URL);
+      } catch (e) {
+        status.textContent = "connecting to local daemon…";
+        setTimeout(ping, 500);
+      }
+    }
+    ping();
+  </script>
+</body>
+</html>
