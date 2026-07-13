@@ -68,3 +68,53 @@ pub enum MatchResponse {
     #[serde(rename = "r")]
     RatioExceeded,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{Match, ModelId};
+
+    fn a_match(audit: bool) -> Match {
+        Match {
+            job_id: "j".into(),
+            provider: "p".into(),
+            multiaddrs: vec!["/ip4/203.0.113.7/tcp/40833".into()],
+            model: ModelId {
+                name: "llama".into(),
+                quant: None,
+            },
+            audit,
+        }
+    }
+
+    #[test]
+    fn match_response_single_char_tags_and_omits_default_audit() {
+        let s = serde_json::to_string(&MatchResponse::Matched(a_match(false))).unwrap();
+        assert!(s.contains(r#""s":"m""#), "tagged with s=m: {s}");
+        assert!(
+            !s.contains("audit"),
+            "audit=false omitted from the wire: {s}"
+        );
+        assert_eq!(
+            serde_json::to_string(&MatchResponse::NoProvider).unwrap(),
+            r#"{"s":"n"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&MatchResponse::RatioExceeded).unwrap(),
+            r#"{"s":"r"}"#
+        );
+    }
+
+    #[test]
+    fn match_response_roundtrips_with_audit_true() {
+        let s = serde_json::to_string(&MatchResponse::Matched(a_match(true))).unwrap();
+        assert!(s.contains(r#""audit":true"#));
+        match serde_json::from_str::<MatchResponse>(&s).unwrap() {
+            MatchResponse::Matched(m) => {
+                assert_eq!(m.job_id, "j");
+                assert!(m.audit);
+            }
+            _ => panic!("expected Matched"),
+        }
+    }
+}

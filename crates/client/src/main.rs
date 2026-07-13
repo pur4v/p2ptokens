@@ -9,7 +9,10 @@ use p2ptokens_client::{run, RunConfig};
 use p2ptokens_shared::config::PlatformConfig;
 
 #[derive(Parser)]
-#[command(name = "p2ptokens", about = "p2ptokens unified client (seeder + leecher)")]
+#[command(
+    name = "p2ptokens",
+    about = "p2ptokens unified client (seeder + leecher)"
+)]
 struct Args {
     /// path to a p2ptokens.toml config file (else ./p2ptokens.toml or defaults)
     #[arg(long)]
@@ -47,8 +50,7 @@ struct Args {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 

@@ -53,14 +53,15 @@ struct Args {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
     let args = Args::parse();
     let cfg = PlatformConfig::load(args.config.as_deref());
-    let listen = args.listen.unwrap_or_else(|| cfg.coordinator.listen.clone());
+    let listen = args
+        .listen
+        .unwrap_or_else(|| cfg.coordinator.listen.clone());
     let join_secret = args.join_secret.or_else(|| cfg.join_secret());
 
     if args.allow_unsigned_heartbeats {
@@ -99,7 +100,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/providers", get(list_providers))
         // Private-network gate: require the join secret on every request but the
         // health probe (no-op on an open network).
-        .layer(middleware::from_fn_with_state(shared.clone(), require_secret))
+        .layer(middleware::from_fn_with_state(
+            shared.clone(),
+            require_secret,
+        ))
         // Cap every request body: these are all tiny metadata payloads, so a
         // 32 KiB ceiling stops oversized/hostile bodies from being buffered.
         .layer(DefaultBodyLimit::max(32 * 1024))
@@ -157,7 +161,10 @@ async fn heartbeat(AxState(st): AxState<Shared>, Json(hb): Json<Heartbeat>) -> S
     StatusCode::OK
 }
 
-async fn do_match(AxState(st): AxState<Shared>, Json(req): Json<MatchRequest>) -> Json<MatchResponse> {
+async fn do_match(
+    AxState(st): AxState<Shared>,
+    Json(req): Json<MatchRequest>,
+) -> Json<MatchResponse> {
     st.touch_ledger(&req.consumer);
 
     if !st.consumer_allowed(&req.consumer) {

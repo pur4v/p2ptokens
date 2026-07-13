@@ -126,6 +126,49 @@ impl LedgerEntry {
     }
 }
 
+#[cfg(test)]
+mod type_tests {
+    use super::*;
+
+    #[test]
+    fn model_key_formats() {
+        assert_eq!(
+            ModelId {
+                name: "llama".into(),
+                quant: None
+            }
+            .key(),
+            "llama"
+        );
+        assert_eq!(
+            ModelId {
+                name: "llama".into(),
+                quant: Some("q4".into())
+            }
+            .key(),
+            "llama@q4"
+        );
+        // empty quant is treated as no quant
+        assert_eq!(
+            ModelId {
+                name: "llama".into(),
+                quant: Some(String::new())
+            }
+            .key(),
+            "llama"
+        );
+    }
+
+    #[test]
+    fn ledger_ratio_math() {
+        let mut e = LedgerEntry::new("p".into(), 0);
+        assert!(e.ratio().is_infinite()); // nothing consumed yet
+        e.consumed = 100;
+        e.served = 50;
+        assert!((e.ratio() - 0.5).abs() < 1e-9);
+    }
+}
+
 // ---- Chat completion surface (the subset we support) ----
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

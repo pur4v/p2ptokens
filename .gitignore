@@ -8,6 +8,18 @@
 .env.*
 .DS_Store
 
+# secrets / creds — NEVER commit (repo is public)
+# real config carries a join_secret + backend keys; only the *.example is safe
+p2ptokens.toml
+**/p2ptokens.toml
+*.pem
+*.key
+id_ed25519*
+.railway/
+railway.toml.local
+.secrets/
+secrets.*
+
 # local runtime data (identity keypairs, per-run dirs)
 /.p2ptokens/
 /.p2p/

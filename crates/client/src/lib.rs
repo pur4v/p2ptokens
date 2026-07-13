@@ -87,14 +87,11 @@ impl Default for RunConfig {
 
 /// Resolve the data directory (explicit override, else the per-OS data dir).
 pub fn resolve_data_dir(data_dir: &Option<String>) -> PathBuf {
-    data_dir
-        .clone()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            dirs::data_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join("p2ptokens")
-        })
+    data_dir.clone().map(PathBuf::from).unwrap_or_else(|| {
+        dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("p2ptokens")
+    })
 }
 
 /// Start the unified client and serve until the process exits.

@@ -425,7 +425,9 @@ mod tests {
                 })
                 .collect();
             for r in relays {
-                assert!(once.iter().any(|p| matches!(p, Protocol::P2p(id) if id == r)));
+                assert!(once
+                    .iter()
+                    .any(|p| matches!(p, Protocol::P2p(id) if id == r)));
             }
         }
     }

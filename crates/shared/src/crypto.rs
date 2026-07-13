@@ -15,9 +15,7 @@ pub fn generate_identity() -> Keypair {
 
 /// Serialize a keypair (secret included) to a base64 string for on-disk storage.
 pub fn export_secret(kp: &Keypair) -> Result<String> {
-    let bytes = kp
-        .to_protobuf_encoding()
-        .context("encode keypair")?;
+    let bytes = kp.to_protobuf_encoding().context("encode keypair")?;
     Ok(B64.encode(bytes))
 }
 
