@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.p2p-chat-root {
+  --fc-primary: #7c3aed;
+  --fc-primary-hover: #6d28d9;
+  --fc-user-bubble: #f3f4f6;
+  --fc-user-bubble-border: #e5e7eb;
+  --fc-assistant-border: #e5e7eb;
+  --fc-bg: #ffffff;
+  --fc-text: #111827;
+  --fc-text-secondary: #6b7280;
+  --fc-spacing-msg-x: 1rem;
+  --fc-spacing-msg-y: 0.75rem;
+  --fc-spacing-msg-gap: 0.5rem;
+  --fc-spacing-container: 1rem;
+  --fc-border: #e5e7eb;
+  --fc-surface: #f9fafb;
+  --fc-surface-hover: #f3f4f6;
+  --fc-success: #22c55e;
+  --fc-error: #ef4444;
+  --fc-warning: #eab308;
+  --fc-link: #3b82f6;
+  --fc-code-bg: #f9fafb;
+  --fc-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --fc-radius: 0.75rem;
+  --fc-radius-input: 1rem;
+
+  font-family: var(--fc-font-family);
+  line-height: 1.5;
+  color: var(--fc-text);
+}
+
+/* Animation for progress message */
+@keyframes fc-wave {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.p2p-chat-root * {
+  box-sizing: border-box;
+}
+
+/* Custom range slider for ProgressPreview */
+.p2p-chat-root input[type="range"].fc-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--fc-border);
+  outline: none;
+  cursor: pointer;
+}
+
+.p2p-chat-root input[type="range"].fc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fc-primary);
+  border: 2px solid var(--fc-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.p2p-chat-root input[type="range"].fc-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fc-primary);
+  border: 2px solid var(--fc-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.p2p-chat-root input[type="range"].fc-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--fc-border);
+}

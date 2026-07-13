@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>p2ptokens</title>
+<link rel="stylesheet" href="/chat.min.css">
+<style>
+  :root {
+    --bg:#ffffff; --bg-2:#f8f9fb; --panel:#ffffff; --elev:#f3f4f6; --border:#e8eaed;
+    --border-strong:#d6d9de; --text:#0d1117; --muted:#616a76; --faint:#97a0ac;
+    --accent:#2563eb; --accent-2:#1d4ed8; --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  [data-theme="dark"] {
+    --bg:#0d0f13; --bg-2:#111318; --panel:#14171d; --elev:#1a1e26; --border:#232833;
+    --border-strong:#323947; --text:#e8eaf0; --muted:#98a2b3; --faint:#667085; --accent:#4b8bff; --accent-2:#6ba1ff;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14.5px; }
+  .app { display:flex; flex-direction:column; height:100vh; }
+  .topbar { display:flex; align-items:center; gap:16px; padding:10px 18px; border-bottom:1px solid var(--border); background:var(--panel); flex:none; flex-wrap:wrap; }
+  .brand { display:flex; align-items:center; gap:9px; }
+  .brand svg { width:26px; height:26px; color:var(--accent); }
+  .brand b { font-weight:650; font-size:16px; letter-spacing:-.01em; }
+  .nav { display:flex; gap:2px; background:var(--elev); border:1px solid var(--border); border-radius:8px; padding:3px; }
+  .nav button { border:0; background:transparent; color:var(--muted); font:inherit; font-weight:550; font-size:13.5px; padding:6px 14px; border-radius:6px; cursor:pointer; }
+  .nav button.active { background:var(--panel); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.1); }
+  .ctl { display:inline-flex; align-items:center; gap:7px; }
+  .ctl span { color:var(--muted); font-size:12.5px; font-weight:550; }
+  .ctl input, .ctl select { background:var(--panel); border:1px solid var(--border-strong); color:var(--text); border-radius:8px; padding:6px 9px; font:inherit; font-size:13px; }
+  .ctl input[type=number]{ width:3.4em; }
+  #count-ctl { display:none; }
+  .spacer { flex:1; }
+  .pill { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; background:var(--elev); border:1px solid var(--border); border-radius:8px; padding:6px 12px; }
+  .pill b { color:var(--text); font-weight:600; }
+  .dot { width:8px; height:8px; border-radius:50%; background:#22c55e; }
+  .dot.off { background:#dc2626; }
+  .iconbtn { width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:var(--elev); color:var(--muted); cursor:pointer; display:grid; place-items:center; }
+  .main { flex:1; min-height:0; }
+  #view-chat { display:grid; grid-template-columns:288px 1fr; height:100%; min-height:0; }
+  @media (max-width:820px){ #view-chat{ grid-template-columns:1fr; } #sidebar{ display:none; } }
+  #sidebar { border-right:1px solid var(--border); min-height:0; overflow:hidden; background:var(--bg-2); }
+  #chat { min-height:0; overflow:hidden; }
+  #sidebar > *, #chat > * { height:100%; }
+  /* network view */
+  .net { max-width:1040px; margin:0 auto; padding:24px; overflow-y:auto; height:100%; }
+  .card { border:1px solid var(--border); background:var(--panel); border-radius:14px; margin-bottom:18px; overflow:hidden; box-shadow:0 1px 2px rgba(16,24,40,.05); }
+  .card-h { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); }
+  .card-h h3 { margin:0; font-size:13px; font-weight:650; }
+  .card-h .aux { color:var(--faint); font-size:12.5px; }
+  .card-b { padding:16px; }
+  .grid { display:grid; grid-template-columns:1fr auto; gap:20px; align-items:center; }
+  .kv .k { color:var(--faint); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  .kv .v { font-family:var(--mono); font-size:13px; word-break:break-all; }
+  .ratio { text-align:center; border:1px solid var(--border); border-radius:9px; padding:14px 26px; min-width:150px; background:var(--bg-2); }
+  .ratio .rl { color:var(--faint); font-size:11px; letter-spacing:.1em; text-transform:uppercase; }
+  .ratio .rn { font-size:38px; font-weight:700; margin:4px 0; }
+  .good{color:#16a34a}[data-theme="dark"] .good{color:#4ade80} .warn{color:#d97706} .bad{color:#dc2626}
+  .counters{ display:flex; gap:28px; margin-top:14px; flex-wrap:wrap; }
+  .counters .cl{ color:var(--faint); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  .counters .cv{ font-size:20px; font-weight:650; margin-top:2px; }
+  table{ width:100%; border-collapse:collapse; } th,td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); font-size:13px; }
+  th{ color:var(--faint); text-transform:uppercase; font-size:11px; letter-spacing:.04em; } td.mono{ font-family:var(--mono); font-size:12px; }
+  .num{ text-align:right; } .badge{ font-size:11px; padding:1px 7px; border-radius:999px; background:rgba(37,99,235,.12); color:var(--accent); border:1px solid rgba(37,99,235,.3); }
+  .empty{ color:var(--faint); font-style:italic; padding:8px 2px; font-size:13px; }
+  .statusbar{ display:flex; justify-content:space-between; align-items:center; padding:7px 18px; border-top:1px solid var(--border); color:var(--faint); font-size:12px; background:var(--panel); flex:none; }
+  .statusbar a{ color:var(--faint); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="6" r="3.4" fill="currentColor"/><circle cx="6.5" cy="24" r="3.4" fill="currentColor"/><circle cx="25.5" cy="24" r="3.4" fill="currentColor"/><path d="M16 8.5 L8 21.5 M16 8.5 L24 21.5 M9 24 H23" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" opacity=".55"/></svg>
+      <b id="brand-name">p2ptokens</b>
+    </div>
+    <nav class="nav">
+      <button id="tab-chat" class="active">Chat</button>
+      <button id="tab-network">Network</button>
+    </nav>
+    <label class="ctl"><span>Model</span><input id="model" list="models" placeholder="llama3.2:3b" autocomplete="off" style="width:180px"><datalist id="models"></datalist></label>
+    <label class="ctl"><span>Strategy</span>
+      <select id="strategy">
+        <option value="single">Single · streaming</option>
+        <option value="racing">Racing · fastest of N</option>
+        <option value="quorum">Quorum · majority of N</option>
+        <option value="ensemble">Ensemble · all N</option>
+      </select>
+    </label>
+    <label class="ctl" id="count-ctl"><span>Peers</span><input id="count" type="number" min="2" max="5" value="3"></label>
+    <span class="spacer"></span>
+    <span class="pill"><span class="dot" id="dot"></span> <b id="peers">0</b>&nbsp;peers · <b id="modelsn">0</b>&nbsp;models</span>
+    <button class="iconbtn" id="theme" title="Toggle theme"></button>
+  </header>
+
+  <div class="main">
+    <section id="view-chat">
+      <div id="sidebar"></div>
+      <div id="chat"></div>
+    </section>
+    <section id="view-network" style="display:none">
+      <div class="net">
+        <div class="card">
+          <div class="card-h"><h3>This node</h3><span class="aux" id="inflight">— / —</span></div>
+          <div class="card-b">
+            <div class="grid">
+              <div>
+                <div class="kv"><div class="k">Peer ID</div><div class="v" id="peer">—</div></div>
+                <div class="kv" style="margin-top:12px"><div class="k">Listen addrs</div><div class="v" id="addrs">—</div></div>
+              </div>
+              <div class="ratio"><div class="rl">Barter ratio</div><div class="rn good" id="ratio">—</div><div class="rl" id="ratioh">seed &gt; leech</div></div>
+            </div>
+            <div class="counters">
+              <div><div class="cl">Up · served</div><div class="cv good" id="served">—</div></div>
+              <div><div class="cl">Down · consumed</div><div class="cv warn" id="consumed">—</div></div>
+              <div><div class="cl">Capacity</div><div class="cv" id="capacity">—</div></div>
+              <div><div class="cl">Reputation</div><div class="cv" id="rep">—</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>Seeding</h3><span class="aux" id="offern">0 models</span></div>
+          <div class="card-b"><table><thead><tr><th>Model</th><th>Backend</th></tr></thead><tbody id="offers"></tbody></table><div class="empty" id="offers-empty" style="display:none">No local backends — leech-only.</div></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>Swarm</h3><span class="aux" id="swarmn">0 peers</span></div>
+          <div class="card-b"><table><thead><tr><th>Peer</th><th>Models</th><th class="num">Cap</th><th class="num">Active</th></tr></thead><tbody id="swarm"></tbody></table><div class="empty" id="swarm-empty" style="display:none">No seeders online.</div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="statusbar">
+    <span id="conn">● initializing…</span>
+    <span id="foot"><a href="https://p2ptokens.com" target="_blank" rel="noopener">p2ptokens.com</a> · <a href="https://github.com/pur4v/p2ptokens" target="_blank" rel="noopener">GitHub</a></span>
+  </footer>
+</div>
+
+<script src="/chat.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ var d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
+  function truncId(id){ return !id?"—":(id.length<=16?id:id.slice(0,10)+"…"+id.slice(-4)); }
+  function fmt(n){ return (n==null||isNaN(n))?"—":Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,","); }
+
+  /* strategy state read by the adapter */
+  var strat = { get model(){ return $("model").value.trim() || $("model").placeholder || ""; },
+                get mode(){ return $("strategy").value; },
+                get count(){ return parseInt($("count").value,10)||3; } };
+  $("strategy").addEventListener("change", function(){ $("count-ctl").style.display = $("strategy").value==="single" ? "none":"inline-flex"; });
+
+  /* theme (widget reads --fc-* vars; override on .p2p-chat-root for dark) */
+  var darkStyle = null;
+  var DARK_VARS = ".p2p-chat-root{--fc-bg-color:#0d0f13;--fc-bg-card-color:#14171d;--fc-bg-secondary-color:#1a1e26;--fc-text-color:#e8eaf0;--fc-text-dimmed-color:#98a2b3;--fc-text-active-color:#4b8bff;--fc-border-color:#232833;--fc-border-dimmed-color:#323947;--fc-primary-color:#4b8bff;--fc-primary-hover-color:#6ba1ff;}";
+  var SUN='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  var MOON='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+  function applyTheme(t){
+    document.documentElement.setAttribute("data-theme", t);
+    $("theme").innerHTML = t==="dark"?SUN:MOON;
+    if (t==="dark"){ if(!darkStyle){ darkStyle=document.createElement("style"); darkStyle.textContent=DARK_VARS; document.head.appendChild(darkStyle); } }
+    else if (darkStyle){ darkStyle.remove(); darkStyle=null; }
+  }
+  var theme="light"; try{ theme=localStorage.getItem("p2p_theme")||"light"; }catch(e){}
+  applyTheme(theme);
+  $("theme").addEventListener("click", function(){ theme=theme==="dark"?"light":"dark"; try{localStorage.setItem("p2p_theme",theme);}catch(e){} applyTheme(theme); });
+
+  /* tabs */
+  function showTab(n){ $("view-chat").style.display=n==="chat"?"grid":"none"; $("view-network").style.display=n==="network"?"":"none"; $("tab-chat").classList.toggle("active",n==="chat"); $("tab-network").classList.toggle("active",n==="network"); }
+  $("tab-chat").addEventListener("click",function(){showTab("chat");});
+  $("tab-network").addEventListener("click",function(){showTab("network");});
+
+  /* ---- adapter → our Rust backend ---- */
+  function readDataUrl(file){ return new Promise(function(res,rej){ var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.onerror=rej; fr.readAsDataURL(file); }); }
+  var adapter = {
+    startStream: async function(params){
+      var body = {
+        message: { content: params.message },
+        thread_id: params.isNewChat ? null : params.threadId,
+        model: strat.model, strategy: strat.mode, count: strat.count,
+        images: (params.images||[]).map(function(im){ return { url:im.url, filename:im.filename||"", type:im.type||"" }; })
+      };
+      var r = await fetch("/streaming/chat/start", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+      if(!r.ok || !r.body) throw new Error("stream failed: "+r.status);
+      return r.body;
+    },
+    cancelStream: async function(){},
+    resumeStream: async function(){ throw new Error("resume unsupported"); },
+    fetchThreads: async function(params){ var q=encodeURIComponent((params&&params.query)||""); var r=await fetch("/threads?query="+q); return await r.json(); },
+    deleteThread: async function(id){ await fetch("/threads/"+id, {method:"DELETE"}); },
+    fetchThreadMessages: async function(id, signal){ var r=await fetch("/threads/thread/"+id+"/messages",{signal}); return await r.json(); },
+    fetchSuggestions: async function(){ return { success:true, data:{ suggestions:[] } }; },
+    uploadFile: async function(file){ var url=await readDataUrl(file); return { type:file.type||"application/octet-stream", filename:file.name, url:url }; },
+    submitReaction: async function(){}
+  };
+
+  /* ---- mount the widget (after brand config) ---- */
+  function mount(brand){
+    var accent = (brand && brand.accent) || "#2563eb";
+    if (brand && brand.product_name){ $("brand-name").textContent = brand.product_name; document.title = brand.product_name; }
+    var commonConfig = {
+      apiBaseUrl: "", getAuthHeaders: function(){ return {}; },
+      productMode: "devas",
+      enableFileUpload: true, enableMessageEdit: true, enableToolPreview: true,
+      themeConfig: { primaryColor: accent, primaryHoverColor: accent },
+      textConfig: { inputPlaceholder: "Message the swarm…", emptyStateTitle: (brand&&brand.product_name)||"p2ptokens", emptyStateSubtitle: "Ask the swarm — a peer serves your completion, end-to-end." },
+      onThreadChange: function(){}
+    };
+    try {
+      P2PTokensChat.render("History", "#sidebar", commonConfig, { showDeleteButton:true, newChatButtonText:"New chat" }, adapter);
+      P2PTokensChat.render("ChatContainer", "#chat", commonConfig, { enableComputerTool:true }, adapter);
+    } catch (e) { $("chat").innerHTML = "<div style='padding:24px;color:var(--muted)'>Failed to mount chat UI: "+esc(e.message)+"</div>"; }
+  }
+  fetch("/api/config",{cache:"no-store"}).then(function(r){return r.json();}).then(mount).catch(function(){ mount(null); });
+
+  /* ---- Network tab: poll /api/status ---- */
+  function setConn(ok){ $("conn").textContent = ok?"● connected":"● daemon unreachable — retrying"; $("dot").className = ok?"dot":"dot off"; }
+  function render(d){
+    $("peer").textContent = truncId(d.peer_id||"");
+    $("addrs").textContent = (d.listen_addrs||[]).join("  ") || "(none)";
+    var r=d.ratio, el=$("ratio"), inf=(r==="inf"||r===null||r==="Infinity");
+    var cls,hint;
+    if(inf){ el.textContent="∞"; cls="good"; hint="pure seeder"; }
+    else { var rv=Number(r); el.textContent=isNaN(rv)?"—":rv.toFixed(2); if(rv>=1){cls="good";hint="healthy seeder";} else if(rv>=0.5){cls="warn";hint="seed more";} else {cls="bad";hint="leech — throttled";} }
+    el.className="rn "+cls; $("ratioh").textContent=hint;
+    $("served").textContent="▲ "+fmt(d.served); $("consumed").textContent="▼ "+fmt(d.consumed);
+    $("capacity").textContent=(d.capacity==null?"—":d.capacity)+" slots";
+    var rep=Number(d.reputation); $("rep").textContent=isNaN(rep)?"—":Math.round(rep*100)+"%";
+    $("inflight").textContent=(d.in_flight==null?"—":d.in_flight)+" / "+(d.capacity==null?"—":d.capacity)+" active";
+    var offers=d.offers||[]; $("offern").textContent=offers.length+" model"+(offers.length===1?"":"s");
+    var ob=$("offers"); ob.innerHTML=""; $("offers-empty").style.display=offers.length?"none":"block";
+    offers.forEach(function(o){ var tr=document.createElement("tr"); tr.innerHTML="<td class=\"mono\">"+esc(o.model)+"</td><td>"+esc(o.backend)+"</td>"; ob.appendChild(tr); });
+    var swarm=d.swarm||[], peers=(d.swarm_size==null?swarm.length:d.swarm_size);
+    $("peers").textContent=peers; $("swarmn").textContent=peers+" peer"+(peers===1?"":"s");
+    var sb=$("swarm"); sb.innerHTML=""; $("swarm-empty").style.display=swarm.length?"none":"block";
+    swarm.forEach(function(p){ var tr=document.createElement("tr"); tr.innerHTML="<td class=\"mono\">"+esc(truncId(p.peer_id))+" <span class=\"badge\">signed</span></td><td>"+esc((p.models||[]).join(", ")||"—")+"</td><td class=\"num\">"+(p.capacity==null?"—":p.capacity)+"</td><td class=\"num\">"+(p.in_flight==null?"—":p.in_flight)+"</td>"; sb.appendChild(tr); });
+    var set={}; swarm.forEach(function(p){(p.models||[]).forEach(function(m){set[m]=1;});}); offers.forEach(function(o){set[o.model]=1;});
+    var models=Object.keys(set).sort(); $("modelsn").textContent=models.length;
+    var dl=$("models"); dl.innerHTML=""; models.forEach(function(m){ var o=document.createElement("option"); o.value=m; dl.appendChild(o); });
+    if(!$("model").value && models.length) $("model").placeholder=models[0];
+  }
+  function poll(){ fetch("/api/status",{cache:"no-store"}).then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(d){ render(d); setConn(true); }).catch(function(){ setConn(false); }); }
+  poll(); setInterval(poll, 2000);
+})();
+</script>
+</body>
+</html>

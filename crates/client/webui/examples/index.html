@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>p2ptokens - Example</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    .layout { display: flex; height: 100vh; }
+    #sidebar { width: 260px; border-right: 1px solid #e5e7eb; }
+    #chat { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar"></div>
+    <div id="chat"></div>
+  </div>
+
+  <!-- In production, load from your own host -->
+  <script src="../dist/chat.min.js"></script>
+  <script>
+    // Common config — shared by all render() calls
+    const commonConfig = {
+      apiBaseUrl: 'https://your-api.example.com/v1.0',
+      getAuthHeaders: () => ({
+        'Authorization': 'Bearer YOUR_TOKEN_HERE',
+      }),
+      productMode: 'devas',
+      enableToolPreview: true,
+      enableFileUpload: true,
+      enableMessageEdit: true,
+
+      // Theme customization (all optional)
+      themeConfig: {
+        primaryColor: '#2563eb',
+        // primaryHoverColor: '#6d28d9',
+        // backgroundColor: '#ffffff',
+        // textColor: '#111827',
+        // borderRadius: '0.75rem',
+        // successColor: '#22c55e',
+        // errorColor: '#ef4444',
+      },
+
+      // Text customization (all optional)
+      textConfig: {
+        inputPlaceholder: 'How can I help you today?',
+        emptyStateTitle: 'p2ptokens',
+        emptyStateSubtitle: 'Ask the swarm anything',
+        // thinkingText: 'Thinking',
+        // answerCompletedText: 'Answer completed',
+        // followUpTitle: 'Suggested Follow-ups:',
+      },
+
+      onThreadChange: (threadId) => {
+        console.log('Thread changed:', threadId);
+        if (threadId) {
+          window.history.replaceState(null, '', `?thread=${threadId}`);
+        }
+      },
+    };
+
+    // Mount chat container with component-specific config
+    P2PTokensChat.render('ChatContainer', '#chat', commonConfig, {
+      enableComputerTool: true,
+    });
+
+    // Mount history sidebar with component-specific config
+    P2PTokensChat.render('History', '#sidebar', commonConfig, {
+      showDeleteButton: true,
+      newChatButtonText: 'New Chat',
+    });
+  </script>
+</body>
+</html>
