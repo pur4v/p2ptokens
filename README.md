@@ -13,6 +13,9 @@ right to use everyone else's.
 [![Platforms](https://img.shields.io/badge/macOS%20·%20Linux%20·%20Windows-111111?style=flat-square)](#install)
 [![P2P](https://img.shields.io/badge/topology-peer--to--peer-2ea043?style=flat-square)](#how-it-works)
 [![OpenAI-compatible](https://img.shields.io/badge/API-%2Fv1%2Fchat%2Fcompletions-2ea043?style=flat-square)](#quick-start)
+[![Follow @itspur4v](https://img.shields.io/badge/follow-%40itspur4v-111111?style=flat-square&logo=x)](https://x.com/itspur4v)
+
+Built by [**@itspur4v**](https://x.com/itspur4v) · follow for updates
 
 </div>
 
@@ -390,3 +393,15 @@ this project's design. "BitTorrent" is a trademark of its respective owner.
 p2ptokens is an independent, unaffiliated project — not sponsored, endorsed by,
 or associated with BitTorrent, Inc. or any other trademark holder. Other names
 may be trademarks of their respective owners.
+
+---
+
+## Connect
+
+Built and maintained by **[@itspur4v](https://x.com/itspur4v)** — follow on X for
+updates, benchmarks, and roadmap.
+[**→ x.com/itspur4v**](https://x.com/itspur4v)
+
+**#p2ptokens #DistributedInference #PeerToPeer #P2P #DecentralizedAI #LLM #LLMInference #SelfHosted #OpenSourceAI #Rust #libp2p #OpenAICompatible #Ollama #AIInfra #EdgeAI #BitTorrentProtocol**
+
+<sub><b>Keywords:</b> distributed LLM inference · peer-to-peer AI · decentralized inference network · self-hosted OpenAI-compatible API · run your own private LLM mesh · BitTorrent-style token sharing · seed/leech GPU compute · Ollama over P2P · libp2p inference · enterprise on-prem LLM · fork-and-run AI platform.</sub>
