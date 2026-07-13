@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use libp2p::PeerId;
 
+use p2ptokens_shared::config::BrandConfig;
 use p2ptokens_shared::crypto;
 use p2ptokens_shared::types::ModelOffer;
 
@@ -33,6 +34,10 @@ pub struct Ctx {
     pub offers: Vec<ModelOffer>,
     pub capacity: u32,
     pub in_flight: Arc<AtomicU32>,
+    /// network namespace (scopes the libp2p protocol → swarm isolation)
+    pub network_id: String,
+    /// white-label branding served to the dashboard via `/api/config`
+    pub brand: BrandConfig,
 }
 
 pub type SharedCtx = Arc<Ctx>;

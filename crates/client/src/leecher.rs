@@ -7,7 +7,7 @@ use libp2p::{Multiaddr, PeerId, StreamProtocol};
 use tokio::sync::mpsc;
 
 use p2ptokens_shared::api::{MatchManyRequest, MatchResponse};
-use p2ptokens_shared::protocol::{read_msg, write_msg, Wire, COMPLETION_PROTOCOL};
+use p2ptokens_shared::protocol::{completion_protocol, read_msg, write_msg, Wire};
 use p2ptokens_shared::receipts::{sign_receipt, ReceiptBody, SignedReceipt};
 use p2ptokens_shared::types::{ChatCompletionParams, ChatMessage, Match, MatchRequest, ModelId};
 
@@ -125,9 +125,8 @@ async fn run_with_match<F: FnMut(&str)>(
 
     ctx.node.connect(provider, addrs).await?;
     let mut control = ctx.node.control();
-    let mut s = control
-        .open_stream(provider, StreamProtocol::new(COMPLETION_PROTOCOL))
-        .await?;
+    let proto = StreamProtocol::try_from_owned(completion_protocol(&ctx.network_id))?;
+    let mut s = control.open_stream(provider, proto).await?;
 
     write_msg(
         &mut s,

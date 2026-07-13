@@ -21,6 +21,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 
+use p2ptokens_shared::config::{BrandConfig, PlatformConfig};
 use p2ptokens_shared::crypto;
 use p2ptokens_shared::types::{Heartbeat, ModelOffer};
 
@@ -46,22 +47,41 @@ pub struct RunConfig {
     pub relay: bool,
     /// multiaddr of a relay to reserve a slot on
     pub relay_addr: Option<String>,
+    /// network namespace — isolates this swarm from other networks (Q: platform)
+    pub network_id: String,
+    /// bearer secret for a private network (attached to coordinator requests)
+    pub join_secret: Option<String>,
+    /// white-label branding served to the dashboard
+    pub brand: BrandConfig,
+}
+
+impl RunConfig {
+    /// Build the daemon config from a loaded [`PlatformConfig`] (the single
+    /// surface a fork edits to run its own private, branded network).
+    pub fn from_platform(cfg: PlatformConfig) -> Self {
+        // Compute borrows before moving fields out of `cfg`.
+        let join_secret = cfg.join_secret();
+        let relay_addr = (!cfg.relay.addr.trim().is_empty()).then(|| cfg.relay.addr.clone());
+        Self {
+            coordinator: cfg.coordinator.url,
+            http: cfg.client.http,
+            p2p_listen: cfg.client.p2p_listen,
+            data_dir: None,
+            capacity: cfg.client.capacity,
+            relay: cfg.client.relay,
+            relay_addr,
+            network_id: cfg.network.id,
+            join_secret,
+            brand: cfg.brand,
+        }
+    }
 }
 
 impl Default for RunConfig {
     fn default() -> Self {
-        Self {
-            // Ship pointing at the hosted coordinator; override with
-            // P2PTOKENS_COORDINATOR (e.g. http://127.0.0.1:4000 for local dev).
-            coordinator: std::env::var("P2PTOKENS_COORDINATOR")
-                .unwrap_or_else(|_| "https://coordinator.p2ptokens.com".to_string()),
-            http: "127.0.0.1:8080".to_string(),
-            p2p_listen: "/ip4/0.0.0.0/tcp/0".to_string(),
-            data_dir: None,
-            capacity: 4,
-            relay: false,
-            relay_addr: None,
-        }
+        // Load config file + env (so `P2PTOKENS_COORDINATOR` etc. still apply),
+        // falling back to the built-in public-network defaults.
+        Self::from_platform(PlatformConfig::load(None))
     }
 }
 
@@ -94,6 +114,7 @@ pub async fn run(cfg: RunConfig) -> Result<()> {
             listen: cfg.p2p_listen.parse()?,
             relay: cfg.relay,
             relay_addr,
+            network_id: cfg.network_id.clone(),
         },
     )
     .await?;
@@ -156,12 +177,14 @@ pub async fn run(cfg: RunConfig) -> Result<()> {
         pubkey_b64,
         local_peer,
         node,
-        coord: CoordinatorClient::new(cfg.coordinator.clone()),
+        coord: CoordinatorClient::new(cfg.coordinator.clone(), cfg.join_secret.clone()),
         adapters,
         model_index,
         offers,
         capacity: cfg.capacity,
         in_flight: Arc::new(AtomicU32::new(0)),
+        network_id: cfg.network_id.clone(),
+        brand: cfg.brand.clone(),
     });
 
     // Seeder: serve inbound completion streams.

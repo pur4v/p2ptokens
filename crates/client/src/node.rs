@@ -26,7 +26,7 @@ use libp2p_stream as stream;
 use tokio::sync::{mpsc, oneshot};
 
 use p2ptokens_shared::crypto;
-use p2ptokens_shared::protocol::COMPLETION_PROTOCOL;
+use p2ptokens_shared::protocol::{completion_protocol, identify_protocol};
 
 #[derive(NetworkBehaviour)]
 struct Behaviour {
@@ -89,6 +89,9 @@ pub struct NodeConfig {
     pub relay: bool,
     /// address of a relay to reserve a slot on (for reachability behind NAT)
     pub relay_addr: Option<Multiaddr>,
+    /// network namespace — scopes the libp2p protocol ids so peers on different
+    /// networks can't interconnect.
+    pub network_id: String,
 }
 
 pub async fn start(
@@ -96,6 +99,8 @@ pub async fn start(
     cfg: NodeConfig,
 ) -> Result<(NodeHandle, stream::IncomingStreams)> {
     let is_relay = cfg.relay;
+    let identify_proto = identify_protocol(&cfg.network_id);
+    let completion_proto = completion_protocol(&cfg.network_id);
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
         .with_tokio()
         .with_tcp(
@@ -109,7 +114,7 @@ pub async fn start(
             Behaviour {
                 stream: stream::Behaviour::new(),
                 identify: identify::Behaviour::new(identify::Config::new(
-                    "/p2ptokens/id/1.0.0".into(),
+                    identify_proto.clone(),
                     key.public(),
                 )),
                 ping: ping::Behaviour::new(ping::Config::new()),
@@ -132,7 +137,7 @@ pub async fn start(
 
     let local_peer = *swarm.local_peer_id();
     let mut control = swarm.behaviour().stream.new_control();
-    let incoming = control.accept(StreamProtocol::new(COMPLETION_PROTOCOL))?;
+    let incoming = control.accept(StreamProtocol::try_from_owned(completion_proto)?)?;
 
     swarm.listen_on(cfg.listen)?;
 

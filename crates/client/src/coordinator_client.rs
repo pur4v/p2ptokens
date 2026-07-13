@@ -11,19 +11,29 @@ use p2ptokens_shared::types::{Heartbeat, LedgerEntry, Match, MatchRequest};
 pub struct CoordinatorClient {
     base: String,
     http: reqwest::Client,
+    /// bearer secret for a private network (attached to every request).
+    secret: Option<String>,
 }
 
 impl CoordinatorClient {
-    pub fn new(base: String) -> Self {
+    pub fn new(base: String, secret: Option<String>) -> Self {
         Self {
             base: base.trim_end_matches('/').to_string(),
             http: reqwest::Client::new(),
+            secret,
+        }
+    }
+
+    /// Attach the private-network bearer secret if this client has one.
+    fn authed(&self, rb: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match &self.secret {
+            Some(s) => rb.bearer_auth(s),
+            None => rb,
         }
     }
 
     pub async fn heartbeat(&self, hb: &Heartbeat) -> Result<()> {
-        self.http
-            .post(format!("{}/heartbeat", self.base))
+        self.authed(self.http.post(format!("{}/heartbeat", self.base)))
             .json(hb)
             .send()
             .await
@@ -34,8 +44,7 @@ impl CoordinatorClient {
 
     pub async fn request_match(&self, req: &MatchRequest) -> Result<MatchResponse> {
         let resp = self
-            .http
-            .post(format!("{}/match", self.base))
+            .authed(self.http.post(format!("{}/match", self.base)))
             .json(req)
             .send()
             .await
@@ -47,8 +56,7 @@ impl CoordinatorClient {
     /// Fan-out matchmaking: ask for up to `count` distinct providers.
     pub async fn request_matches(&self, req: &MatchManyRequest) -> Result<Vec<Match>> {
         let resp = self
-            .http
-            .post(format!("{}/match_many", self.base))
+            .authed(self.http.post(format!("{}/match_many", self.base)))
             .json(req)
             .send()
             .await
@@ -64,8 +72,7 @@ impl CoordinatorClient {
 
     pub async fn settle(&self, req: &SettleRequest) -> Result<SettleResponse> {
         let resp = self
-            .http
-            .post(format!("{}/settle", self.base))
+            .authed(self.http.post(format!("{}/settle", self.base)))
             .json(req)
             .send()
             .await
@@ -76,8 +83,7 @@ impl CoordinatorClient {
 
     pub async fn providers(&self) -> Result<Vec<Heartbeat>> {
         let resp = self
-            .http
-            .get(format!("{}/providers", self.base))
+            .authed(self.http.get(format!("{}/providers", self.base)))
             .send()
             .await
             .context("providers")?
@@ -88,8 +94,7 @@ impl CoordinatorClient {
     /// Fetch a peer's ledger entry. Returns None if the coordinator has no record.
     pub async fn ledger(&self, peer: &str) -> Result<Option<LedgerEntry>> {
         let resp = self
-            .http
-            .get(format!("{}/ledger/{peer}", self.base))
+            .authed(self.http.get(format!("{}/ledger/{peer}", self.base)))
             .send()
             .await
             .context("ledger")?;

@@ -9,8 +9,19 @@ use serde::{Deserialize, Serialize};
 use crate::receipts::SignedReceipt;
 use crate::types::{ChatCompletionParams, ChatMessage};
 
-/// Protocol id negotiated on the libp2p stream.
-pub const COMPLETION_PROTOCOL: &str = "/p2ptokens/completion/1.0.0";
+/// Protocol id negotiated on the libp2p stream (the `public` network default).
+pub const COMPLETION_PROTOCOL: &str = "/p2ptokens/public/completion/1.0.0";
+
+/// Network-scoped completion protocol id. Peers on different `network_id`s
+/// cannot negotiate this stream, so an org's swarm is isolated from others.
+pub fn completion_protocol(network_id: &str) -> String {
+    format!("/p2ptokens/{network_id}/completion/1.0.0")
+}
+
+/// Network-scoped identify protocol id (mirrors `completion_protocol`).
+pub fn identify_protocol(network_id: &str) -> String {
+    format!("/p2ptokens/{network_id}/id/1.0.0")
+}
 
 const MAX_FRAME: usize = 8 * 1024 * 1024;
 

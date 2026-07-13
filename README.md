@@ -30,19 +30,9 @@ applied to inference — which keeps the swarm honest. A central coordinator
 brokers matches but **never sees your data**: the inference bytes flow directly,
 peer-to-peer.
 
-```
-        ┌────────────┐   match · ratio · settle  (HTTP, metadata only)  ┌────────────┐
-        │  peer A    │◀───────────────┐        ┌────────────────────────▶│  peer B    │
-        │ (seeder)   │                ▼        ▼                          │ (leecher)  │
-        │            │          ┌───────────────────┐                    │            │
-        │ Ollama /   │          │    coordinator    │                    │  /v1/chat/ │
-        │ endpoint / │          │ (content-blind    │                    │ completions│
-        │ Claude     │          │  tracker)         │                    │  endpoint  │
-        └─────┬──────┘          └───────────────────┘                    └──────┬─────┘
-              │        libp2p stream: completion tokens + signed co-receipts     │
-              └──────────────────────────────────────────────────────────────────┘
-                              inference bytes never touch the coordinator
-```
+<div align="center">
+  <img src="assets/architecture.svg" alt="p2ptokens architecture — content-blind coordinator, P2P data plane, relay, fan-out" width="900">
+</div>
 
 ---
 
@@ -220,9 +210,43 @@ export ANTHROPIC_API_KEY=sk-ant-...       P2P_CLAUDE_MODELS=claude-3-5-sonnet-la
 export P2P_OLLAMA=1                        # on by default; set 0 to disable
 ```
 
-> ⚠️ Proxying paid/hosted API access to strangers may violate that provider's
-> terms and can get the account banned. User-borne risk by design; only Ollama
-> (local) is risk-free.
+> [!WARNING]
+> Proxying paid/hosted API access to strangers may violate that provider's terms
+> and can get the account banned. User-borne risk by design; only Ollama (local)
+> is risk-free.
+
+---
+
+## 🏢 Run your own network (self-host / enterprise)
+
+p2ptokens is a **platform** — fork it and run your org's **own private, branded
+swarm**. One config file (`p2ptokens.toml`) does it; with no config you just join
+the public network.
+
+```bash
+cp p2ptokens.example.toml p2ptokens.toml   # then edit [network]/[coordinator]/[brand]
+
+# your coordinator (private — requires the join secret)
+p2p-coordinator --config p2ptokens.toml
+
+# each org machine joins the same network + secret
+p2ptokens --config p2ptokens.toml
+```
+
+| Set in `[network]` / `[brand]` | What it does |
+| :--- | :--- |
+| `id` | **Network isolation** — peers on a different `id` literally can't open a stream to yours (scoped libp2p protocol). |
+| `private` + `join_secret` | **Enterprise gate** — the coordinator rejects any request without `Authorization: Bearer <secret>` → only your machines join. |
+| `coordinator.url` / `relay.addr` | Point clients at **your** coordinator and relay. |
+| `[brand]` (name, tagline, accent, logo, links) | **White-label** the dashboard live via `/api/config` — no rebuild. |
+
+> [!TIP]
+> Precedence is **CLI flags > env vars > `p2ptokens.toml` > defaults**, so you can
+> override any single value at launch (e.g. `--network-id acme --join-secret …`).
+
+> [!IMPORTANT]
+> v1 coordinator state is in-memory (single instance, no DB yet). Fine for a team;
+> for HA, externalize the registry/ledger to Redis/Postgres (scaling path).
 
 ---
 
@@ -248,8 +272,9 @@ protocol assumes everyone is hostile.
   derive (no duplicated peer ids, no default fields) — smaller attack surface and
   lower egress.
 
-**Honest limit:** in v1 the serving peer sees prompts **in plaintext** — there is
-no TEE/sandbox yet (contractual only). **v1 is for non-sensitive workloads.**
+> [!CAUTION]
+> **Honest limit:** in v1 the serving peer sees prompts **in plaintext** — there
+> is no TEE/sandbox yet (contractual only). **v1 is for non-sensitive workloads.**
 
 ---
 
@@ -316,7 +341,8 @@ Draft documents live in [`legal/`](legal/README.md): Privacy, Cookie, Terms,
 Acceptable Use, and Provider Agreement (+ DPA). The dashboard ships an **18+ age
 gate** and a **cookie-consent banner**.
 
-> ⚠️ **Drafts, not legal advice.** Written to reflect the real v1 architecture
+> [!WARNING]
+> **Drafts, not legal advice.** Written to reflect the real v1 architecture
 > honestly (providers see plaintext; no technical anti-logging/sandbox yet — it's
 > contractual). Have counsel review and resolve every `[bracketed]` placeholder
 > before publishing.

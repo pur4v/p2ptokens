@@ -183,7 +183,7 @@
 <body>
 <div class="wrap">
 
-  <pre class="banner">▓▓▓▓   ▓▓▓  ▓▓▓▓     ▓▓▓▓▓  ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓  ▓▓▓▓
+  <pre class="banner" id="banner">▓▓▓▓   ▓▓▓  ▓▓▓▓     ▓▓▓▓▓  ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓  ▓▓▓▓
 ▓   ▓ ▓   ▓ ▓   ▓      ▓   ▓   ▓ ▓  ▓  ▓     ▓▓  ▓ ▓
 ▓▓▓▓     ▓  ▓▓▓▓       ▓   ▓   ▓ ▓▓▓   ▓▓▓▓  ▓ ▓ ▓  ▓▓▓
 ▓       ▓   ▓          ▓   ▓   ▓ ▓  ▓  ▓     ▓  ▓▓     ▓
@@ -292,7 +292,7 @@
     <span id="conn-status" class="ok">◉ initializing…</span>
     <span id="last-poll">—</span>
   </div>
-  <div class="foot">
+  <div class="foot" id="foot">
     p2ptokens · <a href="https://p2ptokens.com" target="_blank" rel="noopener">p2ptokens.com</a> ·
     <a href="https://github.com/pur4v/p2ptokens" target="_blank" rel="noopener">GitHub</a> ·
     <a href="https://p2ptokens.com/privacy" target="_blank" rel="noopener">Privacy</a> ·
@@ -638,9 +638,39 @@
   });
   $("new-chat").addEventListener("click", newConvo);
 
+  // white-label: re-skin from /api/config (product name, tagline, colors, links, logo)
+  function applyBrand() {
+    fetch("/api/config", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (b) {
+        if (!b) return;
+        var name = b.product_name || "p2ptokens";
+        document.title = name + " // " + (b.network || "swarm");
+        var rs = document.documentElement.style;
+        if (b.accent) { rs.setProperty("--green", b.accent); rs.setProperty("--green-dim", b.accent); }
+        if (b.amber) { rs.setProperty("--amber", b.amber); }
+        var tl = document.querySelector(".tagline");
+        if (tl && b.tagline) tl.innerHTML = "// " + esc(b.tagline) + " // <span class=\"cursor\">█</span>";
+        if (b.logo_url) {
+          var ban = $("banner");
+          if (ban) { var img = document.createElement("img"); img.src = b.logo_url; img.alt = name; img.style.maxWidth = "480px"; img.style.display = "block"; ban.replaceWith(img); }
+        }
+        var web = b.website || "", gh = b.github || "", foot = $("foot");
+        if (foot) {
+          var parts = [esc(name)];
+          if (web) parts.push('<a href="' + esc(web) + '" target="_blank" rel="noopener">' + esc(web.replace(/^https?:\/\//, "")) + '</a>');
+          if (gh) parts.push('<a href="' + esc(gh) + '" target="_blank" rel="noopener">GitHub</a>');
+          if (web) { parts.push('<a href="' + esc(web) + '/privacy" target="_blank" rel="noopener">Privacy</a>'); parts.push('<a href="' + esc(web) + '/terms" target="_blank" rel="noopener">Terms</a>'); }
+          foot.innerHTML = parts.join(" · ");
+        }
+      })
+      .catch(function () {});
+  }
+
   // init
   if (convos.length) currentId = convos[0].id;
   renderConvos(); renderThread();
+  applyBrand();
   poll(); setInterval(poll, 2000);
 })();
 </script>

@@ -115,14 +115,19 @@ pub struct State {
     /// accept heartbeats without a valid signature — INSECURE, for local load
     /// testing only (synthetic peers can't sign). Off by default.
     pub allow_unsigned: bool,
+    /// shared bearer secret for a PRIVATE network; when set, requests must
+    /// present it. None = open network (public default).
+    pub join_secret: Option<String>,
     match_counter: AtomicU64,
 }
 
 impl State {
-    /// Build state, optionally accepting unsigned heartbeats (load-test only).
-    pub fn new(allow_unsigned: bool) -> Self {
+    /// Build state. `allow_unsigned` = accept unsigned heartbeats (load-test
+    /// only). `join_secret` = require this bearer on requests (private network).
+    pub fn new(allow_unsigned: bool, join_secret: Option<String>) -> Self {
         Self {
             allow_unsigned,
+            join_secret,
             ..Default::default()
         }
     }

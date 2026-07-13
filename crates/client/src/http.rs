@@ -30,6 +30,7 @@ use crate::leecher::{fan_out, leech, leech_stream, Fanout, StreamItem};
 pub fn router(ctx: SharedCtx) -> Router {
     Router::new()
         .route("/", get(index))
+        .route("/api/config", get(config))
         .route("/api/status", get(status))
         .route("/v1/models", get(models))
         .route("/v1/chat/completions", post(chat_completions))
@@ -38,6 +39,22 @@ pub fn router(ctx: SharedCtx) -> Router {
 
 async fn index() -> Html<&'static str> {
     Html(include_str!("ui.html"))
+}
+
+/// White-label branding + network identity for the dashboard to render.
+async fn config(State(ctx): State<SharedCtx>) -> Json<Value> {
+    let b = &ctx.brand;
+    Json(json!({
+        "product_name": b.product_name,
+        "tagline": b.tagline,
+        "accent": b.accent,
+        "amber": b.amber,
+        "website": b.website,
+        "github": b.github,
+        "support_email": b.support_email,
+        "logo_url": b.logo_url,
+        "network": ctx.network_id,
+    }))
 }
 
 fn parse_model(s: &str) -> ModelId {

@@ -10,8 +10,10 @@ mod state;
 use std::sync::Arc;
 
 use axum::{
-    extract::{DefaultBodyLimit, Json, Path, State as AxState},
+    extract::{DefaultBodyLimit, Json, Path, Request, State as AxState},
     http::StatusCode,
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
@@ -21,6 +23,7 @@ use p2ptokens_shared::api::{
     ErrorResponse, MatchManyRequest, MatchManyResponse, MatchResponse, SettleRequest,
     SettleResponse,
 };
+use p2ptokens_shared::config::PlatformConfig;
 use p2ptokens_shared::crypto;
 use p2ptokens_shared::receipts::verify_settlement;
 use p2ptokens_shared::types::{Heartbeat, LedgerEntry, Match, MatchRequest};
@@ -32,9 +35,15 @@ type Shared = Arc<State>;
 #[derive(Parser)]
 #[command(name = "p2p-coordinator", about = "p2ptokens tracker")]
 struct Args {
-    /// address to listen on
-    #[arg(long, default_value = "127.0.0.1:4000")]
-    listen: String,
+    /// path to a p2ptokens.toml config file (else ./p2ptokens.toml or defaults)
+    #[arg(long)]
+    config: Option<String>,
+    /// address to listen on (overrides config `coordinator.listen`)
+    #[arg(long)]
+    listen: Option<String>,
+    /// shared join secret for a PRIVATE network (overrides config `network.join_secret`)
+    #[arg(long)]
+    join_secret: Option<String>,
     /// accept unsigned heartbeats (INSECURE — local load testing only)
     #[arg(long, default_value_t = false)]
     allow_unsigned_heartbeats: bool,
@@ -50,10 +59,19 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let args = Args::parse();
+    let cfg = PlatformConfig::load(args.config.as_deref());
+    let listen = args.listen.unwrap_or_else(|| cfg.coordinator.listen.clone());
+    let join_secret = args.join_secret.or_else(|| cfg.join_secret());
+
     if args.allow_unsigned_heartbeats {
         tracing::warn!("accepting UNSIGNED heartbeats — insecure, use for load testing only");
     }
-    let shared: Shared = Arc::new(State::new(args.allow_unsigned_heartbeats));
+    if join_secret.is_some() {
+        tracing::info!(network = %cfg.network.id, "PRIVATE network — join secret required on all requests");
+    } else {
+        tracing::info!(network = %cfg.network.id, "open network");
+    }
+    let shared: Shared = Arc::new(State::new(args.allow_unsigned_heartbeats, join_secret));
 
     // Background job sweep: drop abandoned jobs (e.g. the peers a fan-out race
     // drops, or a consumer that died mid-stream) so they can't accumulate.
@@ -79,15 +97,18 @@ async fn main() -> anyhow::Result<()> {
         .route("/settle", post(settle))
         .route("/ledger/{peer}", get(get_ledger))
         .route("/providers", get(list_providers))
+        // Private-network gate: require the join secret on every request but the
+        // health probe (no-op on an open network).
+        .layer(middleware::from_fn_with_state(shared.clone(), require_secret))
         // Cap every request body: these are all tiny metadata payloads, so a
         // 32 KiB ceiling stops oversized/hostile bodies from being buffered.
         .layer(DefaultBodyLimit::max(32 * 1024))
         .with_state(shared);
 
-    let listener = tokio::net::TcpListener::bind(&args.listen).await?;
+    let listener = tokio::net::TcpListener::bind(&listen).await?;
     tracing::info!(
         "coordinator listening on {} ({} worker threads)",
-        args.listen,
+        listen,
         std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(1)
@@ -99,6 +120,26 @@ async fn main() -> anyhow::Result<()> {
 /// Liveness probe for load balancers / uptime checks.
 async fn health() -> &'static str {
     "ok"
+}
+
+/// Private-network gate: when a join secret is configured, every request except
+/// `/health` must carry `Authorization: Bearer <join_secret>`. No-op otherwise.
+async fn require_secret(AxState(st): AxState<Shared>, req: Request, next: Next) -> Response {
+    if let Some(secret) = &st.join_secret {
+        if req.uri().path() != "/health" {
+            let ok = req
+                .headers()
+                .get(axum::http::header::AUTHORIZATION)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.strip_prefix("Bearer "))
+                .map(|t| t == secret)
+                .unwrap_or(false);
+            if !ok {
+                return (StatusCode::UNAUTHORIZED, "join secret required").into_response();
+            }
+        }
+    }
+    next.run(req).await
 }
 
 async fn heartbeat(AxState(st): AxState<Shared>, Json(hb): Json<Heartbeat>) -> StatusCode {

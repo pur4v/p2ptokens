@@ -1,0 +1,52 @@
+# p2ptokens — run your OWN private, branded network.
+#
+# Copy to `p2ptokens.toml` and edit. Both the coordinator and the client read it
+# (pass --config <path>, or place it in the working dir, or set $P2PTOKENS_CONFIG).
+# Precedence, highest first:  CLI flags  >  env vars  >  this file  >  built-in defaults.
+# With NO file and NO flags you join the public network with default branding.
+
+[network]
+# Isolation namespace. Peers on different ids CANNOT interconnect, so this is
+# what makes your swarm private/separate from the public one. Pick something
+# unique to your org.
+id = "acme"
+# Display name shown in the dashboard.
+name = "Acme AI Mesh"
+# Require the shared secret below on every coordinator request (enterprise gate).
+private = true
+# Shared bearer secret — only peers that present it can join your coordinator.
+# Generate one, keep it secret, distribute to your org's machines.
+join_secret = "change-me-to-a-long-random-secret"
+
+[coordinator]
+# URL your clients use to reach the coordinator.
+url = "https://coordinator.acme.example.com"
+# Address the coordinator process binds to.
+listen = "0.0.0.0:4000"
+
+[relay]
+# Optional: a public libp2p relay multiaddr your NAT'd peers reserve a slot on.
+# Leave empty if peers are directly reachable.
+addr = ""
+
+[client]
+http = "127.0.0.1:8080"           # local dashboard + /v1 endpoint
+p2p_listen = "/ip4/0.0.0.0/tcp/0" # libp2p listen address
+capacity = 4                       # max concurrent jobs this node serves
+relay = false                      # set true to run this node as a public relay server
+
+[brand]
+# White-label the dashboard (served at runtime via /api/config — no rebuild).
+product_name = "Acme AI Mesh"
+tagline = "internal inference swarm — seed to leech"
+accent = "#33ff88"                 # primary color (CSS)
+amber = "#ffb000"                  # secondary color (CSS)
+website = "https://acme.example.com"
+github = "https://github.com/acme/p2ptokens"
+support_email = "ai-platform@acme.example.com"
+logo_url = ""                      # optional image URL to replace the ASCII banner
+
+# Backends stay configured via environment variables (BYO-credentials):
+#   P2P_OLLAMA=1                         # serve your local Ollama (on by default)
+#   P2P_ENDPOINT_URL=... P2P_ENDPOINT_KEY=... P2P_ENDPOINT_MODELS=a,b
+#   ANTHROPIC_API_KEY=... P2P_CLAUDE_MODELS=claude-3-5-sonnet-latest
