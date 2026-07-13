@@ -12,6 +12,7 @@ mod http;
 mod leecher;
 mod node;
 mod seeder;
+mod threads;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -232,6 +233,7 @@ pub async fn run(cfg: RunConfig) -> Result<()> {
         tps_ema: Arc::new(AtomicU64::new(0)),
         network_id: cfg.network_id.clone(),
         brand: cfg.brand.clone(),
+        threads: Arc::new(threads::ThreadStore::open(&data_dir.join("history.db"))?),
     });
 
     // Seeder: serve inbound completion streams.

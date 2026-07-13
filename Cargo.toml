@@ -25,6 +25,8 @@ clap = { version = "4", features = ["derive", "env"] }
 axum = "0.8"
 reqwest = { version = "0.13", features = ["json", "stream", "native-tls-vendored"] }
 dirs = "5"
+rusqlite = { version = "0.32", features = ["bundled"] }
+rust-embed = { version = "8", features = ["mime-guess"] }
 libp2p-identity = { version = "0.2", features = ["ed25519", "peerid", "rand"] }
 libp2p = { version = "0.56", features = [
   "tokio",

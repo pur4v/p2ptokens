@@ -26,3 +26,7 @@ secrets.*
 
 # tauri generated files
 /crates/desktop/gen/
+
+# vendored web UI build artifacts (built in CI)
+crates/client/webui/node_modules/
+crates/client/webui/dist/

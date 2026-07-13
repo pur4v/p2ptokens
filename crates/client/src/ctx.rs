@@ -41,6 +41,8 @@ pub struct Ctx {
     pub network_id: String,
     /// white-label branding served to the dashboard via `/api/config`
     pub brand: BrandConfig,
+    /// local SQLite chat history (threads + messages)
+    pub threads: Arc<crate::threads::ThreadStore>,
 }
 
 pub type SharedCtx = Arc<Ctx>;
