@@ -128,8 +128,8 @@ impl OllamaAdapter {
                     estimated += estimate_tokens(&text);
                 }
                 let cumulative = c.eval_count.unwrap_or(estimated);
-                if !text.is_empty() {
-                    if tx
+                if !text.is_empty()
+                    && tx
                         .send(CompletionDelta {
                             text,
                             cumulative_tokens: cumulative,
@@ -138,9 +138,8 @@ impl OllamaAdapter {
                         })
                         .await
                         .is_err()
-                    {
-                        return Ok(()); // consumer went away
-                    }
+                {
+                    return Ok(()); // consumer went away
                 }
                 if c.done {
                     let _ = tx

@@ -109,7 +109,6 @@ pub struct Provider {
 pub struct Job {
     pub consumer: String,
     pub provider: String,
-    pub model: ModelId,
     pub audit: bool,
     /// creation time (ms) — used by the TTL sweep to drop abandoned jobs.
     pub created: u64,
@@ -215,12 +214,10 @@ impl State {
             let Some(set) = self.by_model.get(&req.name) else {
                 return candidates;
             };
-            let mut scanned = 0usize;
-            for entry in set.iter() {
+            for (scanned, entry) in set.iter().enumerate() {
                 if candidates.len() >= MATCH_SAMPLE || scanned >= MATCH_MAX_SCAN {
                     break;
                 }
-                scanned += 1;
                 let pid = entry.key().clone();
                 if pid == consumer {
                     continue;
@@ -278,7 +275,8 @@ impl State {
     }
 
     /// Choose a provider for a model (no capability requirement). Convenience over
-    /// [`Self::select_provider_req`].
+    /// [`Self::select_provider_req`] — used by tests; production calls the `_req` form.
+    #[cfg(test)]
     pub fn select_provider(
         &self,
         req: &ModelId,
@@ -304,7 +302,7 @@ impl State {
 
         let counter = self.match_counter.fetch_add(1, Ordering::Relaxed) + 1;
 
-        if counter % AUDIT_EVERY == 0 {
+        if counter.is_multiple_of(AUDIT_EVERY) {
             let newcomers: Vec<usize> = (0..candidates.len())
                 .filter(|&i| candidates[i].newcomer)
                 .collect();
@@ -322,6 +320,8 @@ impl State {
     }
 
     /// Fan-out: up to `k` DISTINCT providers (no capability requirement).
+    /// Used by tests; production calls the `_req` form.
+    #[cfg(test)]
     pub fn select_providers(
         &self,
         req: &ModelId,
@@ -707,7 +707,6 @@ mod tests {
         let job = |created: u64| Job {
             consumer: "c".into(),
             provider: "p".into(),
-            model: model("llama"),
             audit: false,
             created,
         };

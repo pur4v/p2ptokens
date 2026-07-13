@@ -35,11 +35,7 @@ pub struct CompletionResult {
 /// Streaming events emitted to a caller (used by the SSE endpoint).
 pub enum StreamItem {
     Delta(String),
-    Done {
-        finish_reason: String,
-        cumulative_tokens: u64,
-        provider: String,
-    },
+    Done { finish_reason: String },
     Err(String),
 }
 
@@ -71,8 +67,6 @@ pub fn leech_stream(
             Ok(r) => {
                 let _ = tx.send(StreamItem::Done {
                     finish_reason: r.finish_reason,
-                    cumulative_tokens: r.cumulative_tokens,
-                    provider: r.provider,
                 });
             }
             Err(e) => {
@@ -245,15 +239,6 @@ impl Fanout {
             "quorum" | "vote" | "redundant" => Some(Fanout::Quorum),
             "ensemble" | "moa" | "all" => Some(Fanout::Ensemble),
             _ => None,
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Fanout::Single => "single",
-            Fanout::Racing => "racing",
-            Fanout::Quorum => "quorum",
-            Fanout::Ensemble => "ensemble",
         }
     }
 }
@@ -434,8 +419,6 @@ pub fn fan_out_stream(
                     Ok(r) => {
                         let _ = tx_out.send(StreamItem::Done {
                             finish_reason: r.finish_reason,
-                            cumulative_tokens: r.cumulative_tokens,
-                            provider: r.provider,
                         });
                     }
                     Err(e) => {

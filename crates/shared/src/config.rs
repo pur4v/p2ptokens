@@ -1,10 +1,10 @@
 //! Platform configuration — the single surface an org edits to run its OWN
 //! private, branded p2ptokens network.
 //!
-//! Load precedence (highest wins): CLI flags (applied by each binary) > env vars
-//! > `p2ptokens.toml` file > built-in defaults. With no file and no flags the
-//! defaults reproduce today's public-network behavior, so existing setups keep
-//! working unchanged.
+//! Load precedence (highest wins): CLI flags (applied by each binary), then env
+//! vars, then a `p2ptokens.toml` file, then built-in defaults. With no file and
+//! no flags the defaults reproduce today's public-network behavior, so existing
+//! setups keep working unchanged.
 
 use serde::Deserialize;
 

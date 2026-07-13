@@ -307,9 +307,9 @@ async fn stream_response(
                         Event::default().data(chunk(json!({ "content": t }), Value::Null)),
                     );
                 }
-                StreamItem::Done { finish_reason, .. } => {
+                StreamItem::Done { finish_reason } => {
                     yield Ok(Event::default().data(chunk(json!({}), json!(finish_reason))));
-                    yield Ok(Event::default().data("[DONE]".to_string()));
+                    yield Ok(Event::default().data("[DONE]"));
                     break;
                 }
                 StreamItem::Err(e) => {

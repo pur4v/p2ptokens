@@ -4,8 +4,8 @@
 //!   - identify   — exchange observed addresses
 //!   - autonat    — detect whether we're publicly reachable
 //!   - upnp       — try to auto-open a router port (like a torrent client)
-//!   - relay      — client: reserve a slot on a public relay; server (--relay):
-//!                  be that public rendezvous for others
+//!   - relay      — client: reserve a slot on a public relay; server (--relay)
+//!     is that public rendezvous for others
 //!   - dcutr      — hole-punch a direct connection through the relay
 //!
 //! This mirrors how modern torrent clients connect: UPnP + a connectable
@@ -53,7 +53,6 @@ pub struct NodeHandle {
     control: stream::Control,
     cmd_tx: mpsc::Sender<Command>,
     listen_addrs: Arc<Mutex<Vec<Multiaddr>>>,
-    local_peer: PeerId,
 }
 
 impl NodeHandle {
@@ -135,7 +134,6 @@ pub async fn start(
         .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(120)))
         .build();
 
-    let local_peer = *swarm.local_peer_id();
     let mut control = swarm.behaviour().stream.new_control();
     let incoming = control.accept(StreamProtocol::try_from_owned(completion_proto)?)?;
 
@@ -163,7 +161,6 @@ pub async fn start(
         control: control.clone(),
         cmd_tx,
         listen_addrs: listen_addrs.clone(),
-        local_peer,
     };
 
     let mut pending: HashMap<PeerId, Vec<oneshot::Sender<Result<(), String>>>> = HashMap::new();

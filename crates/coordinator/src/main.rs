@@ -180,7 +180,6 @@ async fn do_match(
                 Job {
                     consumer: req.consumer.clone(),
                     provider: provider.clone(),
-                    model: concrete.clone(),
                     audit,
                     created: now_ms(),
                 },
@@ -221,7 +220,6 @@ async fn do_match_many(
                 Job {
                     consumer: req.consumer.clone(),
                     provider: provider.clone(),
-                    model: concrete.clone(),
                     audit,
                     created: now_ms(),
                 },
