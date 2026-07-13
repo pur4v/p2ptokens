@@ -105,8 +105,8 @@ impl Default for BrandConfig {
         Self {
             product_name: "p2ptokens".into(),
             tagline: "distributed inference swarm — seed to leech".into(),
-            accent: "#33ff88".into(),
-            amber: "#ffb000".into(),
+            accent: "#2563eb".into(),
+            amber: "#d97706".into(),
             website: "https://p2ptokens.com".into(),
             github: "https://github.com/pur4v/p2ptokens".into(),
             support_email: String::new(),
@@ -210,7 +210,7 @@ mod tests {
         assert_eq!(c.network.id, "acme");
         assert_eq!(c.network.name, "p2ptokens"); // missing key -> default
         assert_eq!(c.brand.product_name, "Acme AI");
-        assert_eq!(c.brand.accent, "#33ff88"); // missing key -> default
+        assert_eq!(c.brand.accent, "#2563eb"); // missing key -> default
         assert_eq!(c.coordinator.listen, "127.0.0.1:4000"); // missing section -> default
         assert_eq!(c.join_secret().as_deref(), Some("s3cret"));
     }

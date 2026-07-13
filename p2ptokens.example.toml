@@ -39,8 +39,8 @@ relay = false                      # set true to run this node as a public relay
 # White-label the dashboard (served at runtime via /api/config — no rebuild).
 product_name = "Acme AI Mesh"
 tagline = "internal inference swarm — seed to leech"
-accent = "#33ff88"                 # primary color (CSS)
-amber = "#ffb000"                  # secondary color (CSS)
+accent = "#2563eb"                 # primary color (CSS) — buttons, links, highlights
+amber = "#d97706"                  # secondary color (CSS)
 website = "https://acme.example.com"
 github = "https://github.com/acme/p2ptokens"
 support_email = "ai-platform@acme.example.com"
