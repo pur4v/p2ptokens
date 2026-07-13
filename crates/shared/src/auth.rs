@@ -105,6 +105,28 @@ mod tests {
     }
 
     #[test]
+    fn survives_json_roundtrip_with_nonzero_tps() {
+        // A heartbeat that has served traffic carries a non-zero tokens_per_sec and
+        // capabilities on its offers. It must still verify after crossing the wire
+        // (sign -> JSON -> parse -> verify), like a real provider heartbeat.
+        let kp = crypto::generate_identity();
+        let mut hb = sample();
+        hb.peer_id = crypto::peer_id(&kp).to_string();
+        hb.offers[0].tokens_per_sec = 10.456355223567767;
+        hb.offers[0].caps = crate::types::ModelCaps {
+            vision: true,
+            ..Default::default()
+        };
+        sign_heartbeat(&kp, &mut hb).unwrap();
+        let json = serde_json::to_string(&hb).unwrap();
+        let received: Heartbeat = serde_json::from_str(&json).unwrap();
+        assert!(
+            verify_heartbeat(&received),
+            "heartbeat must verify post-wire"
+        );
+    }
+
+    #[test]
     fn wrong_identity_fails() {
         // sign with one key but claim a different peer_id -> rejected
         let signer = crypto::generate_identity();

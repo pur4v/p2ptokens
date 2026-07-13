@@ -113,6 +113,34 @@ fn caps_for_backend(backend: &str) -> ModelCaps {
     }
 }
 
+/// Heuristic: does this model name look multimodal (vision-capable)? Lets local
+/// backends (Ollama) advertise `vision` per-model so image prompts get routed to
+/// a peer that can actually see them (matching still falls back if none do).
+fn model_name_suggests_vision(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    [
+        "vision",
+        "llava",
+        "-vl",
+        "vl-",
+        "bakllava",
+        "moondream",
+        "minicpm-v",
+    ]
+    .iter()
+    .any(|m| n.contains(m))
+}
+
+/// Advertised capabilities for a concrete model: backend defaults OR'd with a
+/// per-model vision heuristic.
+fn caps_for_model(backend: &str, model: &str) -> ModelCaps {
+    let mut caps = caps_for_backend(backend);
+    if model_name_suggests_vision(model) {
+        caps.vision = true;
+    }
+    caps
+}
+
 /// Start the unified client and serve until the process exits.
 pub async fn run(cfg: RunConfig) -> Result<()> {
     let data_dir = resolve_data_dir(&cfg.data_dir);
@@ -172,7 +200,7 @@ pub async fn run(cfg: RunConfig) -> Result<()> {
                     offers.push(ModelOffer {
                         model: m.clone(),
                         backend: a.backend().to_string(),
-                        caps: caps_for_backend(a.backend()),
+                        caps: caps_for_model(a.backend(), &m.name),
                         tokens_per_sec: 0.0, // filled from the live EMA at heartbeat time
                     });
                     model_index.entry(key).or_insert(ModelServe {

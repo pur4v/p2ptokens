@@ -9,9 +9,21 @@ use tokio::sync::mpsc;
 use p2ptokens_shared::api::{MatchManyRequest, MatchResponse};
 use p2ptokens_shared::protocol::{completion_protocol, read_msg, write_msg, Wire};
 use p2ptokens_shared::receipts::{sign_receipt, ReceiptBody, SignedReceipt};
-use p2ptokens_shared::types::{ChatCompletionParams, ChatMessage, Match, MatchRequest, ModelId};
+use p2ptokens_shared::types::{
+    ChatCompletionParams, ChatMessage, Match, MatchRequest, ModelCaps, ModelId,
+};
 
 use crate::ctx::{now_ms, SharedCtx};
+
+/// Derive the capabilities a prompt requires from its content — currently just
+/// `vision` when any message carries an image — so the coordinator can route to a
+/// capable peer (falling back to any peer if none advertise it).
+fn caps_required(messages: &[ChatMessage]) -> ModelCaps {
+    ModelCaps {
+        vision: messages.iter().any(|m| m.content.has_image()),
+        ..Default::default()
+    }
+}
 
 pub struct CompletionResult {
     pub text: String,
@@ -79,12 +91,13 @@ async fn run<F: FnMut(&str)>(
     params: ChatCompletionParams,
     on_delta: F,
 ) -> Result<CompletionResult> {
+    let require = caps_required(&messages);
     let match_resp = ctx
         .coord
         .request_match(&MatchRequest {
             consumer: ctx.local_peer.to_string(),
             model,
-            ..Default::default()
+            require,
         })
         .await?;
 
@@ -276,13 +289,14 @@ pub async fn fan_out(
     }
 
     // Ask the coordinator for up to `count` DISTINCT providers (each gets a job).
+    let require = caps_required(&messages);
     let matches = ctx
         .coord
         .request_matches(&MatchManyRequest {
             consumer: ctx.local_peer.to_string(),
             model,
             count,
-            require: Default::default(),
+            require,
         })
         .await?;
     if matches.is_empty() {
@@ -341,6 +355,105 @@ pub async fn fan_out(
             }
         }
     }
+}
+
+/// Streaming racing fan-out: dial up to `count` distinct providers concurrently
+/// and stream the tokens of whichever peer produces the FIRST token, cancelling
+/// the losers. Returns a channel of [`StreamItem`] (same shape as [`leech_stream`]).
+pub fn fan_out_stream(
+    ctx: SharedCtx,
+    model: ModelId,
+    messages: Vec<ChatMessage>,
+    params: ChatCompletionParams,
+    count: u32,
+) -> mpsc::UnboundedReceiver<StreamItem> {
+    use futures::stream::{FuturesUnordered, StreamExt};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    let (tx_out, rx_out) = mpsc::unbounded_channel();
+    tokio::spawn(async move {
+        let require = caps_required(&messages);
+        let matches = match ctx
+            .coord
+            .request_matches(&MatchManyRequest {
+                consumer: ctx.local_peer.to_string(),
+                model,
+                count,
+                require,
+            })
+            .await
+        {
+            Ok(m) if !m.is_empty() => m,
+            Ok(_) => {
+                let _ = tx_out.send(StreamItem::Err("no providers available".into()));
+                return;
+            }
+            Err(e) => {
+                let _ = tx_out.send(StreamItem::Err(e.to_string()));
+                return;
+            }
+        };
+
+        // usize::MAX = "no winner yet"; the first peer to emit a token claims it.
+        let winner = Arc::new(AtomicUsize::new(usize::MAX));
+        let cref = &ctx;
+        let mut futs: FuturesUnordered<_> = matches
+            .into_iter()
+            .enumerate()
+            .map(|(idx, m)| {
+                let txo = tx_out.clone();
+                let w = winner.clone();
+                let msgs = messages.clone();
+                let p = params.clone();
+                async move {
+                    let res = run_with_match(cref, m, msgs, p, move |t| {
+                        // Claim the winner slot on the first token seen anywhere.
+                        if w.load(Ordering::SeqCst) == usize::MAX {
+                            let _ = w.compare_exchange(
+                                usize::MAX,
+                                idx,
+                                Ordering::SeqCst,
+                                Ordering::SeqCst,
+                            );
+                        }
+                        if w.load(Ordering::SeqCst) == idx {
+                            let _ = txo.send(StreamItem::Delta(t.to_string()));
+                        }
+                    })
+                    .await;
+                    (idx, res)
+                }
+            })
+            .collect();
+
+        while let Some((idx, res)) = futs.next().await {
+            let is_winner = winner.load(Ordering::SeqCst) == idx;
+            if is_winner {
+                match res {
+                    Ok(r) => {
+                        let _ = tx_out.send(StreamItem::Done {
+                            finish_reason: r.finish_reason,
+                            cumulative_tokens: r.cumulative_tokens,
+                            provider: r.provider,
+                        });
+                    }
+                    Err(e) => {
+                        let _ = tx_out.send(StreamItem::Err(e.to_string()));
+                    }
+                }
+                break; // dropping `futs` cancels the losing peers' streams
+            }
+            // a non-winner finished (likely errored before producing a token) — keep
+            // waiting for the peer that actually won the race.
+        }
+        // If the loop drained without a winner, everyone failed silently.
+        if winner.load(Ordering::SeqCst) == usize::MAX {
+            let _ = tx_out.send(StreamItem::Err("all providers failed".into()));
+        }
+    });
+
+    rx_out
 }
 
 /// Return the completion whose text is most common (ties → first), plus the

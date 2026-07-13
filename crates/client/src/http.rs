@@ -25,7 +25,7 @@ use serde_json::{json, Value};
 use p2ptokens_shared::types::{ChatCompletionParams, ChatMessage, ModelId};
 
 use crate::ctx::{now_ms, SharedCtx};
-use crate::leecher::{fan_out, leech, leech_stream, Fanout, StreamItem};
+use crate::leecher::{fan_out, fan_out_stream, leech, leech_stream, Fanout, StreamItem};
 
 pub fn router(ctx: SharedCtx) -> Router {
     Router::new()
@@ -193,43 +193,41 @@ async fn chat_completions(State(ctx): State<SharedCtx>, Json(req): Json<ChatRequ
     let created = now_ms() / 1000;
     let model_name = clean_model;
 
-    // Fan-out modes coordinate across peers, so they are non-streaming.
-    if mode != Fanout::Single {
-        return match fan_out(&ctx, model, req.messages, params, mode, count).await {
-            Ok(out) => {
-                let choices: Vec<Value> = out
-                    .choices
-                    .iter()
-                    .enumerate()
-                    .map(|(i, c)| {
-                        json!({
-                            "index": i,
-                            "message": { "role": "assistant", "content": c.text },
-                            "finish_reason": c.finish_reason,
-                            "p2p_provider": c.provider,
-                        })
-                    })
-                    .collect();
-                let total: u64 = out.choices.iter().map(|c| c.cumulative_tokens).sum();
-                Json(json!({
-                    "id": id,
-                    "object": "chat.completion",
-                    "created": created,
-                    "model": model_name,
-                    "choices": choices,
-                    "usage": {
-                        "prompt_tokens": 0,
-                        "completion_tokens": total,
-                        "total_tokens": total,
-                    },
-                    "p2p_fanout": {
-                        "mode": out.mode,
-                        "responded": out.responded,
-                        "agreement": out.agreement,
-                    },
-                }))
-                .into_response()
-            }
+    let streaming = req.stream.unwrap_or(false);
+
+    // Streaming paths. Single always streams; racing streams the winning peer.
+    // Quorum/ensemble aggregate across peers, so they cannot stream and fall
+    // through to the buffered fan-out below.
+    if streaming && mode == Fanout::Single {
+        let rx = leech_stream(ctx, model, req.messages, params);
+        return stream_response(rx, id, created, model_name).await;
+    }
+    if streaming && mode == Fanout::Racing {
+        let rx = fan_out_stream(ctx, model, req.messages, params, count);
+        return stream_response(rx, id, created, model_name).await;
+    }
+
+    // Non-streaming single = one buffered completion.
+    if mode == Fanout::Single {
+        return match leech(&ctx, model, req.messages, params).await {
+            Ok(res) => Json(json!({
+                "id": id,
+                "object": "chat.completion",
+                "created": created,
+                "model": model_name,
+                "p2p_provider": res.provider,
+                "choices": [{
+                    "index": 0,
+                    "message": { "role": "assistant", "content": res.text },
+                    "finish_reason": res.finish_reason,
+                }],
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": res.cumulative_tokens,
+                    "total_tokens": res.cumulative_tokens,
+                }
+            }))
+            .into_response(),
             Err(e) => (
                 StatusCode::BAD_GATEWAY,
                 Json(json!({"error": {"message": e.to_string(), "type": "p2p_error"}})),
@@ -238,29 +236,42 @@ async fn chat_completions(State(ctx): State<SharedCtx>, Json(req): Json<ChatRequ
         };
     }
 
-    if req.stream.unwrap_or(false) {
-        return stream_response(ctx, model, req.messages, params, id, created, model_name).await;
-    }
-
-    match leech(&ctx, model, req.messages, params).await {
-        Ok(res) => Json(json!({
-            "id": id,
-            "object": "chat.completion",
-            "created": created,
-            "model": model_name,
-            "p2p_provider": res.provider,
-            "choices": [{
-                "index": 0,
-                "message": { "role": "assistant", "content": res.text },
-                "finish_reason": res.finish_reason,
-            }],
-            "usage": {
-                "prompt_tokens": 0,
-                "completion_tokens": res.cumulative_tokens,
-                "total_tokens": res.cumulative_tokens,
-            }
-        }))
-        .into_response(),
+    // Buffered fan-out: racing without streaming, plus quorum / ensemble.
+    match fan_out(&ctx, model, req.messages, params, mode, count).await {
+        Ok(out) => {
+            let choices: Vec<Value> = out
+                .choices
+                .iter()
+                .enumerate()
+                .map(|(i, c)| {
+                    json!({
+                        "index": i,
+                        "message": { "role": "assistant", "content": c.text },
+                        "finish_reason": c.finish_reason,
+                        "p2p_provider": c.provider,
+                    })
+                })
+                .collect();
+            let total: u64 = out.choices.iter().map(|c| c.cumulative_tokens).sum();
+            Json(json!({
+                "id": id,
+                "object": "chat.completion",
+                "created": created,
+                "model": model_name,
+                "choices": choices,
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": total,
+                    "total_tokens": total,
+                },
+                "p2p_fanout": {
+                    "mode": out.mode,
+                    "responded": out.responded,
+                    "agreement": out.agreement,
+                },
+            }))
+            .into_response()
+        }
         Err(e) => (
             StatusCode::BAD_GATEWAY,
             Json(json!({"error": {"message": e.to_string(), "type": "p2p_error"}})),
@@ -269,18 +280,14 @@ async fn chat_completions(State(ctx): State<SharedCtx>, Json(req): Json<ChatRequ
     }
 }
 
-/// Server-sent-events streaming response of `chat.completion.chunk` objects.
+/// Server-sent-events streaming response of `chat.completion.chunk` objects,
+/// driven by a [`StreamItem`] channel (single leech or racing fan-out).
 async fn stream_response(
-    ctx: SharedCtx,
-    model: ModelId,
-    messages: Vec<ChatMessage>,
-    params: ChatCompletionParams,
+    mut rx: tokio::sync::mpsc::UnboundedReceiver<StreamItem>,
     id: String,
     created: u64,
     model_name: String,
 ) -> Response {
-    let mut rx = leech_stream(ctx, model, messages, params);
-
     let chunk = move |delta: Value, finish: Value| -> String {
         json!({
             "id": id,
