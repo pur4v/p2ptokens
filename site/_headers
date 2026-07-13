@@ -1,0 +1,9 @@
+# Headers for Cloudflare Pages / Netlify (read from the published output dir).
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+
+/docs/*.svg
+  Cache-Control: public, max-age=31536000, immutable

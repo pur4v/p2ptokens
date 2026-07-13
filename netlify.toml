@@ -1,0 +1,23 @@
+# Netlify hosting for the p2ptokens static site.
+#   landing page → /            docs → /docs/
+# Connect this (private) repo in the Netlify dashboard; no build step needed.
+# Then add the custom domain p2ptokens.com in Site settings → Domain management.
+
+[build]
+  publish = "site"
+  command = ""
+
+# Basic security headers for all pages.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Long-cache immutable assets (svg/png logos, diagrams).
+[[headers]]
+  for = "/docs/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
