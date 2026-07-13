@@ -3,328 +3,404 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>p2ptokens // swarm</title>
+<title>p2ptokens</title>
 <style>
   :root {
-    --bg: #0b0f0b;
-    --panel: #0e140e;
-    --green: #33ff88;
-    --green-dim: #2ecc71;
-    --green-faint: #1c7a44;
-    --amber: #ffb000;
-    --red: #ff4d4d;
-    --fg: #9fe6bd;
-    --muted: #4f7a63;
-    --border: #1f5a3a;
+    --bg: #0a0b0d;
+    --bg-2: #0e1013;
+    --panel: #131519;
+    --panel-2: #171a1f;
+    --elev: #1c2027;
+    --border: #262a31;
+    --border-soft: #1e222840;
+    --text: #e7e9ee;
+    --muted: #9aa1ac;
+    --faint: #6b727d;
+    --accent: #35e08a;
+    --accent-2: #2bc178;
+    --accent-ink: #04130b;
+    --amber: #ffb454;
+    --red: #ff6b6b;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 30px rgba(0,0,0,.35);
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0;
-    background: var(--bg); color: var(--fg);
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 14px; line-height: 1.45;
-  }
+  html, body { margin: 0; padding: 0; height: 100%; }
   body {
-    background-image: repeating-linear-gradient(0deg,
-      rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.10) 3px, rgba(0,0,0,0) 4px);
-    padding: 18px 14px 60px;
+    background: radial-gradient(1200px 600px at 80% -10%, #12251b1a, transparent 60%), var(--bg);
+    color: var(--text); font-family: var(--sans); font-size: 14.5px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 1040px; margin: 0 auto; }
-  a { color: var(--amber); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ::selection { background: rgba(53,224,138,.25); }
 
-  .banner {
-    color: var(--green); white-space: pre; font-size: 12px; line-height: 1.15;
-    text-shadow: 0 0 6px rgba(51,255,136,0.35); overflow-x: auto; margin: 0 0 4px;
-  }
-  .tagline { color: var(--amber); margin: 0 0 14px; letter-spacing: 0.5px; font-size: 13px; }
-  .cursor { display: inline-block; color: var(--green); animation: blink 1s step-end infinite; }
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ---------- top bar ---------- */
+  .topbar { display: flex; align-items: center; gap: 18px; padding: 12px 20px;
+    border-bottom: 1px solid var(--border); background: rgba(14,16,19,.7); backdrop-filter: blur(8px); flex: none; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .logo { width: 26px; height: 26px; display: block; }
+  .brand .name { font-weight: 650; font-size: 16px; letter-spacing: -0.01em; }
+  .brand .name b { color: var(--accent); font-weight: 650; }
+  .nav { display: flex; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
+  .nav button { appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit;
+    font-weight: 550; padding: 6px 16px; border-radius: 999px; cursor: pointer; transition: .15s; }
+  .nav button:hover { color: var(--text); }
+  .nav button.active { background: var(--elev); color: var(--text); box-shadow: var(--shadow); }
+  .spacer { flex: 1; }
+  .swarm-pill { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; }
+  .swarm-pill b { color: var(--text); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .dot.off { background: var(--red); box-shadow: none; }
+
+  .main { flex: 1; min-height: 0; }
+
+  /* ---------- chat ---------- */
+  .chat { display: grid; grid-template-columns: 264px 1fr; height: 100%; min-height: 0; }
+  @media (max-width: 820px) { .chat { grid-template-columns: 1fr; } .sidebar { display: none; } }
+
+  .sidebar { border-right: 1px solid var(--border); background: var(--bg-2); display: flex; flex-direction: column; min-height: 0; }
+  .sidebar .newbtn { margin: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-weight: 600; transition: .15s; }
+  .sidebar .newbtn:hover { border-color: var(--accent); color: var(--accent); }
+  .convos { list-style: none; margin: 0; padding: 0 8px 12px; overflow-y: auto; flex: 1; }
+  .convo { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: var(--radius-sm);
+    cursor: pointer; color: var(--muted); }
+  .convo:hover { background: var(--panel); color: var(--text); }
+  .convo.active { background: var(--elev); color: var(--text); }
+  .convo .ctitle { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px; }
+  .convo .cdel { opacity: 0; color: var(--faint); font-size: 15px; line-height: 1; }
+  .convo:hover .cdel { opacity: 1; }
+  .convo .cdel:hover { color: var(--red); }
+  .sidebar-empty { color: var(--faint); font-size: 13px; padding: 8px 14px; }
+  .sidebar-foot { border-top: 1px solid var(--border); padding: 10px 14px; color: var(--faint); font-size: 11.5px; }
+
+  .chat-main { display: flex; flex-direction: column; min-height: 0; position: relative; }
+  .chat-toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--border);
+    background: rgba(14,16,19,.55); flex-wrap: wrap; }
+  .select, .chat-toolbar input { background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: 7px 10px; font: inherit; font-size: 13px; }
+  .select:focus, .chat-toolbar input:focus, .composer textarea:focus { outline: none; border-color: var(--accent-2); }
+  .field-label { color: var(--faint); font-size: 12px; }
+  .chat-toolbar input[type=number] { width: 3.4em; }
+  #adv-count { display: none; }
+
+  .stream { flex: 1; overflow-y: auto; min-height: 0; scroll-behavior: smooth; }
+  .stream-inner { max-width: 820px; margin: 0 auto; padding: 28px 24px 40px; }
+  .empty-state { text-align: center; color: var(--muted); margin-top: 12vh; }
+  .empty-state .es-logo { width: 46px; height: 46px; opacity: .9; margin-bottom: 14px; }
+  .empty-state h1 { font-size: 20px; font-weight: 600; color: var(--text); margin: 0 0 6px; }
+  .empty-state p { margin: 0; color: var(--muted); }
+
+  .turn { display: flex; gap: 14px; padding: 14px 0; }
+  .turn .avatar { flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; }
+  .turn.user .avatar { background: #2a2f37; color: var(--text); }
+  .turn.assistant .avatar { background: linear-gradient(160deg, var(--accent), var(--accent-2)); color: var(--accent-ink); }
+  .turn .body { flex: 1; min-width: 0; }
+  .turn .role { font-size: 12.5px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+  .turn .content { color: var(--text); word-wrap: break-word; overflow-wrap: anywhere; }
+  .turn.user .content { white-space: pre-wrap; }
+
+  /* markdown */
+  .content h1, .content h2, .content h3 { line-height: 1.3; margin: 1.1em 0 .5em; font-weight: 650; }
+  .content h1 { font-size: 1.4em; } .content h2 { font-size: 1.25em; } .content h3 { font-size: 1.1em; }
+  .content p { margin: .55em 0; }
+  .content ul, .content ol { margin: .5em 0; padding-left: 1.4em; }
+  .content li { margin: .2em 0; }
+  .content blockquote { margin: .6em 0; padding: .2em .9em; border-left: 3px solid var(--border); color: var(--muted); }
+  .content hr { border: 0; border-top: 1px solid var(--border); margin: 1em 0; }
+  .content a { color: var(--accent); }
+  .content code { font-family: var(--mono); font-size: .88em; background: #0000004d; border: 1px solid var(--border);
+    padding: .08em .35em; border-radius: 5px; }
+  .content table { border-collapse: collapse; margin: .6em 0; font-size: .95em; display: block; overflow-x: auto; }
+  .content th, .content td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+  .content th { background: var(--panel); }
+  .code { margin: .7em 0; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: #0b0d10; }
+  .code-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px;
+    background: var(--panel); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .code-head .copy-code { appearance: none; border: 1px solid var(--border); background: var(--elev); color: var(--muted);
+    font: inherit; font-size: 11.5px; padding: 3px 9px; border-radius: 6px; cursor: pointer; }
+  .code-head .copy-code:hover { color: var(--accent); border-color: var(--accent); }
+  .code pre { margin: 0; padding: 12px 14px; overflow-x: auto; }
+  .code pre code { font-family: var(--mono); font-size: 12.8px; background: none; border: 0; padding: 0; color: #d7dbe2; }
+
+  .caret { display: inline-block; width: 8px; height: 1.05em; vertical-align: text-bottom; margin-left: 1px;
+    background: var(--accent); border-radius: 1px; animation: blink 1.05s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
 
-  /* tab bar + api target */
-  .tabrow { display: flex; align-items: flex-end; justify-content: space-between;
-    border-bottom: 1px solid var(--border); margin-bottom: 16px; gap: 8px; flex-wrap: wrap; }
-  .tabs { display: flex; gap: 2px; }
-  .tab { padding: 8px 20px; cursor: pointer; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 1px; font-weight: bold;
-    border: 1px solid transparent; border-bottom: none; background: transparent; }
-  .tab:hover { color: var(--green); }
-  .tab.active { color: var(--bg); background: var(--green-dim); }
-  .apitarget { color: var(--muted); font-size: 11px; padding: 4px 8px; align-self: center; }
-  .apitarget b { color: var(--green); }
-  .apitarget .dot { color: var(--green); }
+  .turn .meta { margin-top: 8px; display: flex; align-items: center; gap: 12px; color: var(--faint); font-size: 12px; }
+  .turn .meta .prov { color: var(--muted); }
+  .turn .actions { display: flex; gap: 6px; opacity: 0; transition: .15s; }
+  .turn:hover .actions { opacity: 1; }
+  .iconbtn { appearance: none; border: 1px solid transparent; background: transparent; color: var(--faint);
+    cursor: pointer; font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 6px; }
+  .iconbtn:hover { color: var(--text); background: var(--panel); border-color: var(--border); }
 
-  /* panels */
-  .panel { border: 1px solid var(--border); background: var(--panel);
-    margin: 0 0 16px; box-shadow: inset 0 0 24px rgba(0,0,0,0.5); }
-  .panel-title { color: var(--bg); background: var(--green-dim); padding: 3px 10px;
-    font-weight: bold; letter-spacing: 2px; text-transform: uppercase;
-    display: flex; justify-content: space-between; align-items: center; }
-  .panel-title .aux { color: var(--bg); background: transparent; font-weight: bold; letter-spacing: 1px; }
-  .panel-body { padding: 12px 14px; }
+  .attach-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 2px; }
+  .att-thumb { width: 74px; height: 74px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); }
+  .att-file { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px; color: var(--muted); max-width: 240px; }
+  .att-file svg { flex: none; color: var(--accent); }
+  .att-file .fn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .field { margin: 2px 0; }
-  .label { color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
-  .value { color: var(--green); word-break: break-all; }
-  .clickcopy { cursor: pointer; border-bottom: 1px dotted var(--green-faint); }
-  .clickcopy:hover { color: var(--amber); border-color: var(--amber); }
-  .copied { color: var(--amber); }
+  .choice-label { font-size: 12px; color: var(--muted); margin: 10px 0 2px; font-weight: 600; }
+  .think { margin: 0 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  .think summary { cursor: pointer; padding: 7px 10px; color: var(--muted); font-size: 12.5px; }
+  .think .tbody { padding: 0 12px 10px; color: var(--muted); white-space: pre-wrap; font-size: 13px; }
 
-  .addrs { list-style: none; margin: 6px 0 0; padding: 0; }
-  .addrs li { color: var(--fg); font-size: 12px; word-break: break-all; }
-  .addrs li::before { content: "└─ "; color: var(--green-faint); }
+  /* composer */
+  .composer-wrap { padding: 14px 24px 20px; }
+  .composer { max-width: 820px; margin: 0 auto; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--panel); box-shadow: var(--shadow); transition: border-color .15s; }
+  .composer.drag { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(53,224,138,.15); }
+  .composer .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 12px 0; }
+  .chip { display: flex; align-items: center; gap: 8px; background: var(--elev); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 8px; font-size: 12.5px; color: var(--muted); }
+  .chip img { width: 26px; height: 26px; border-radius: 5px; object-fit: cover; }
+  .chip .x { cursor: pointer; color: var(--faint); font-size: 15px; line-height: 1; }
+  .chip .x:hover { color: var(--red); }
+  .composer .row { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; }
+  .composer textarea { flex: 1; resize: none; border: 0; background: transparent; color: var(--text); font: inherit;
+    font-size: 15px; line-height: 1.5; max-height: 200px; padding: 6px 4px; }
+  .composer textarea::placeholder { color: var(--faint); }
+  .tool { appearance: none; width: 38px; height: 38px; flex: none; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--elev); color: var(--muted); cursor: pointer; display: grid; place-items: center; transition: .15s; }
+  .tool:hover { color: var(--text); border-color: var(--accent-2); }
+  .send { appearance: none; width: 38px; height: 38px; flex: none; border-radius: 9px; border: 0;
+    background: var(--accent); color: var(--accent-ink); cursor: pointer; display: grid; place-items: center; transition: .15s; }
+  .send:hover { background: var(--accent-2); }
+  .send:disabled { background: #2a2f37; color: var(--faint); cursor: not-allowed; }
+  .send.stop { background: var(--red); color: #fff; }
+  .composer .hint { padding: 0 16px 10px; color: var(--faint); font-size: 11.5px; }
+  .composer .hint .err { color: var(--red); }
 
-  .node-grid { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
-  .ratio-box { text-align: center; border: 1px solid var(--border); padding: 8px 22px; min-width: 150px; }
-  .ratio-box .rlabel { color: var(--muted); font-size: 11px; letter-spacing: 2px; }
-  .ratio-num { font-size: 46px; line-height: 1; font-weight: bold; margin: 4px 0; text-shadow: 0 0 10px currentColor; }
-  .ratio-good { color: var(--green); } .ratio-warn { color: var(--amber); } .ratio-bad { color: var(--red); }
-  .counters { display: flex; gap: 26px; margin-top: 10px; flex-wrap: wrap; }
-  .counter .big { font-size: 20px; font-weight: bold; }
-  .up { color: var(--green); } .down { color: var(--amber); }
-  .rep-wrap { margin-top: 12px; max-width: 340px; }
-  .repbar { border: 1px solid var(--border); height: 14px; background: #061006; position: relative; overflow: hidden; }
-  .repbar > span { display: block; height: 100%;
-    background: repeating-linear-gradient(90deg, var(--green-dim) 0 6px, var(--green-faint) 6px 8px); }
-
+  /* ---------- network ---------- */
+  .net { max-width: 1040px; margin: 0 auto; padding: 24px 24px 60px; overflow-y: auto; height: 100%; }
+  .card { border: 1px solid var(--border); background: var(--panel); border-radius: var(--radius); margin-bottom: 18px; overflow: hidden; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .card-head h3 { margin: 0; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .card-head .aux { color: var(--faint); font-size: 12.5px; }
+  .card-body { padding: 16px; }
+  .node-grid { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; }
+  @media (max-width: 620px){ .node-grid { grid-template-columns: 1fr; } }
+  .kv { margin-bottom: 12px; }
+  .kv .k { color: var(--faint); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .kv .v { color: var(--text); font-family: var(--mono); font-size: 13px; word-break: break-all; }
+  .clickcopy { cursor: pointer; border-bottom: 1px dotted var(--border); }
+  .clickcopy:hover { color: var(--accent); }
+  .addrs { list-style: none; margin: 4px 0 0; padding: 0; }
+  .addrs li { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; }
+  .ratio-box { text-align: center; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 26px; min-width: 156px; background: var(--bg-2); }
+  .ratio-box .rl { color: var(--faint); font-size: 11px; letter-spacing: .12em; }
+  .ratio-num { font-size: 42px; font-weight: 700; line-height: 1.1; margin: 4px 0; }
+  .ratio-good { color: var(--accent); } .ratio-warn { color: var(--amber); } .ratio-bad { color: var(--red); }
+  .counters { display: flex; gap: 30px; margin-top: 16px; flex-wrap: wrap; }
+  .counter .cl { color: var(--faint); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .counter .cv { font-size: 22px; font-weight: 650; margin-top: 2px; }
+  .up { color: var(--accent); } .down { color: var(--amber); }
+  .rep-wrap { margin-top: 18px; max-width: 360px; }
+  .rep-wrap .cl { color: var(--faint); font-size: 12px; }
+  .repbar { margin-top: 6px; height: 8px; border-radius: 999px; background: #0000005e; overflow: hidden; }
+  .repbar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); border-radius: 999px; }
   table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #12351f; }
-  th { color: var(--amber); text-transform: uppercase; font-size: 11px; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
-  td { color: var(--green); }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+  th { color: var(--faint); text-transform: uppercase; font-size: 11px; letter-spacing: .05em; }
+  td { color: var(--text); }
+  td.mono { font-family: var(--mono); font-size: 12px; }
   .num { text-align: right; font-variant-numeric: tabular-nums; }
-  .empty { color: var(--muted); font-style: italic; padding: 8px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 2px 7px; border-radius: 999px;
+    background: rgba(53,224,138,.12); color: var(--accent); border: 1px solid rgba(53,224,138,.3); }
+  .empty { color: var(--faint); font-style: italic; padding: 8px 2px; font-size: 13px; }
 
-  /* form controls */
-  input[type=text], input[type=number], textarea, select {
-    background: #061006; color: var(--green); border: 1px solid var(--border);
-    padding: 7px 9px; font-family: inherit; font-size: 14px;
-  }
-  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--green); }
-  input[type=number] { width: 4.5em; }
-  textarea { resize: vertical; }
-  ::placeholder { color: var(--muted); }
-  button { background: var(--green-dim); color: var(--bg); border: none; padding: 8px 20px;
-    font-family: inherit; font-size: 14px; font-weight: bold; letter-spacing: 1px; cursor: pointer; text-transform: uppercase; }
-  button:hover { background: var(--green); }
-  button:disabled { background: var(--green-faint); cursor: not-allowed; }
-  .btn-secondary { background: transparent; color: var(--amber); border: 1px solid var(--border); }
-  .btn-secondary:hover { background: transparent; color: var(--green); border-color: var(--green); }
+  .statusbar { display: flex; justify-content: space-between; align-items: center; padding: 7px 20px;
+    border-top: 1px solid var(--border); color: var(--faint); font-size: 12px; background: var(--bg-2); flex: none; }
+  .statusbar .ok { color: var(--accent); } .statusbar .fail { color: var(--red); }
+  .statusbar a { color: var(--faint); } .statusbar a:hover { color: var(--muted); }
 
-  /* ---- chat ---- */
-  .chat-wrap { display: grid; grid-template-columns: 230px 1fr; gap: 16px; }
-  @media (max-width: 760px) { .chat-wrap { grid-template-columns: 1fr; } }
-  .convos-panel { border: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; }
-  .convos { list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 60vh; }
-  .convo { padding: 8px 10px; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid #12351f; }
-  .convo:hover { background: #0a130a; }
-  .convo.active { border-left-color: var(--green); background: #0a130a; }
-  .convo .ctitle { color: var(--fg); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .convo .cmeta { color: var(--muted); font-size: 10px; }
-  .convo .cdel { float: right; color: var(--muted); cursor: pointer; }
-  .convo .cdel:hover { color: var(--red); }
-  .convos-empty { color: var(--muted); font-style: italic; padding: 10px; font-size: 12px; }
-
-  .chat-main { border: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; min-height: 480px; }
-  .chat-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
-    padding: 8px 12px; border-bottom: 1px solid var(--border); background: #0a130a; }
-  .chat-head .chip { color: var(--muted); font-size: 11px; }
-  .chat-head .chip b { color: var(--green); }
-  .chat-head .grow { flex: 1; }
-  .chat-head select, .chat-head input { font-size: 12px; padding: 4px 6px; }
-  .msgs { flex: 1; overflow-y: auto; padding: 14px; max-height: 58vh; }
-  .msg { margin-bottom: 16px; }
-  .msg .who { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-  .msg.user .who { color: var(--amber); }
-  .msg.assistant .who { color: var(--green); }
-  .bubble { border: 1px solid var(--border); padding: 10px 12px; white-space: pre-wrap;
-    word-break: break-word; color: var(--fg); background: #061006; }
-  .msg.user .bubble { border-left: 3px solid var(--amber); }
-  .msg.assistant .bubble { border-left: 3px solid var(--green); }
-  .bubble.multi { margin-bottom: 6px; }
-  .bmeta { color: var(--muted); font-size: 11px; margin: 4px 0 0; }
-  .bmeta b { color: var(--amber); }
-  details.think { margin: 0 0 8px; }
-  details.think summary { color: var(--muted); cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-  details.think .tbody { color: var(--muted); font-size: 12px; white-space: pre-wrap; border-left: 1px solid var(--border); padding-left: 10px; margin-top: 6px; }
-  .chat-empty { color: var(--muted); font-style: italic; text-align: center; margin-top: 40px; }
-  .chat-input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); align-items: flex-end; }
-  .chat-input textarea { flex: 1; min-height: 44px; max-height: 160px; }
-  .sendhint { color: var(--muted); font-size: 10px; }
-  .err { color: var(--red); }
-
-  .statusbar { margin-top: 6px; font-size: 12px; color: var(--muted);
-    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-  .ok { color: var(--green); } .fail { color: var(--red); }
-  .foot { margin-top: 14px; color: var(--muted); font-size: 11px; text-align: center; letter-spacing: 0.5px; }
-  .foot a { color: var(--muted); } .foot a:hover { color: var(--green); }
-
-  /* ---- 18+ age gate overlay ---- */
-  .agegate { position: fixed; inset: 0; z-index: 9999; background: rgba(4,8,4,0.96);
-    background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.18) 3px, rgba(0,0,0,0) 4px);
-    display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
-  .agegate-panel { border: 1px solid var(--border); background: var(--panel);
-    box-shadow: inset 0 0 24px rgba(0,0,0,0.6), 0 0 24px rgba(51,255,136,0.12); max-width: 520px; width: 100%; }
-  .agegate-panel .panel-title { font-size: 13px; }
-  .agegate-body { padding: 16px 18px; }
-  .agegate-body h2 { color: var(--green); text-transform: uppercase; letter-spacing: 2px; font-size: 18px; margin: 0 0 12px; text-shadow: 0 0 8px rgba(51,255,136,0.35); }
-  .agegate-body p { color: var(--fg); font-size: 13px; margin: 0 0 16px; }
-  .agegate-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-  .agegate-legal { color: var(--muted); font-size: 11px; letter-spacing: 0.5px; }
-
-  /* ---- cookie consent banner ---- */
-  .cookiebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9000;
-    border-top: 1px solid var(--border); background: var(--panel); box-shadow: 0 -4px 24px rgba(0,0,0,0.6);
-    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; }
-  .cookiebar .cookie-text { color: var(--fg); font-size: 12px; max-width: 620px; }
-  .cookiebar .cookie-text a { color: var(--amber); }
-  .cookie-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-  .cookie-actions button { padding: 6px 16px; font-size: 12px; }
+  /* ---------- overlays ---------- */
+  .agegate { position: fixed; inset: 0; z-index: 9999; background: rgba(6,8,10,.92); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .agegate-panel { border: 1px solid var(--border); background: var(--panel); border-radius: var(--radius);
+    box-shadow: var(--shadow); max-width: 460px; width: 100%; padding: 26px; }
+  .agegate-panel h2 { color: var(--text); font-size: 18px; margin: 0 0 6px; }
+  .agegate-panel .sub { color: var(--faint); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 14px; }
+  .agegate-panel p { color: var(--muted); font-size: 13.5px; margin: 0 0 18px; }
+  .agegate-actions { display: flex; gap: 10px; }
+  .btn { appearance: none; border: 0; border-radius: var(--radius-sm); padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { background: var(--accent-2); }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .agegate-legal { color: var(--faint); font-size: 11.5px; margin-top: 14px; }
+  .cookiebar { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 9000; max-width: 900px; margin: 0 auto;
+    border: 1px solid var(--border); background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .cookiebar .cookie-text { color: var(--muted); font-size: 12.5px; max-width: 620px; }
+  .cookie-actions { display: flex; gap: 10px; }
+  .cookie-actions .btn { padding: 7px 14px; font-size: 13px; }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="app">
 
-  <pre class="banner" id="banner">▓▓▓▓   ▓▓▓  ▓▓▓▓     ▓▓▓▓▓  ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓  ▓▓▓▓
-▓   ▓ ▓   ▓ ▓   ▓      ▓   ▓   ▓ ▓  ▓  ▓     ▓▓  ▓ ▓
-▓▓▓▓     ▓  ▓▓▓▓       ▓   ▓   ▓ ▓▓▓   ▓▓▓▓  ▓ ▓ ▓  ▓▓▓
-▓       ▓   ▓          ▓   ▓   ▓ ▓  ▓  ▓     ▓  ▓▓     ▓
-▓     ▓▓▓▓▓ ▓          ▓    ▓▓▓  ▓   ▓ ▓▓▓▓▓ ▓   ▓ ▓▓▓▓</pre>
-  <p class="tagline">// distributed inference swarm — seed to leech // <span class="cursor">█</span></p>
-
-  <div class="tabrow">
-    <div class="tabs">
-      <button class="tab active" id="tab-btn-chat" data-tab="chat">Chat</button>
-      <button class="tab" id="tab-btn-network" data-tab="network">Network</button>
+  <!-- top bar -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" id="brand-logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="16" cy="6" r="3.4" fill="var(--accent)"/>
+        <circle cx="6.5" cy="24" r="3.4" fill="var(--accent)"/>
+        <circle cx="25.5" cy="24" r="3.4" fill="var(--accent)"/>
+        <path d="M16 8.5 L8 21.5 M16 8.5 L24 21.5 M9 24 H23" stroke="var(--accent)" stroke-width="1.7" stroke-linecap="round" opacity=".65"/>
+      </svg>
+      <span class="name" id="brand-name">p2p<b>tokens</b></span>
     </div>
-    <div class="apitarget"><span class="dot">●</span> SWARM <b id="api-peers">0</b> peers · <b id="api-models">0</b> models</div>
-  </div>
+    <nav class="nav">
+      <button id="tab-btn-chat" class="active" data-tab="chat">Chat</button>
+      <button id="tab-btn-network" data-tab="network">Network</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="swarm-pill"><span class="dot" id="conn-dot"></span> <b id="api-peers">0</b>&nbsp;peers · <b id="api-models">0</b>&nbsp;models</div>
+  </header>
 
-  <!-- ================= CHAT ================= -->
-  <section id="view-chat">
-    <div class="chat-wrap">
-      <div class="convos-panel">
-        <div class="panel-title"><span>┤ CHATS ├</span></div>
+  <div class="main">
+    <!-- ================= CHAT ================= -->
+    <section id="view-chat" class="chat">
+      <aside class="sidebar">
+        <button type="button" class="newbtn" id="new-chat">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          New chat
+        </button>
         <ul class="convos" id="convos"></ul>
-        <div class="convos-empty" id="convos-empty">no conversations yet</div>
-        <div style="padding:8px; border-top:1px solid var(--border)">
-          <button type="button" id="new-chat" style="width:100%">+ NEW</button>
-        </div>
-      </div>
+        <div class="sidebar-empty" id="convos-empty">No conversations yet</div>
+        <div class="sidebar-foot" id="chat-swarm-foot"><b id="chat-swarm">0</b> peers online · content-blind relay</div>
+      </aside>
 
       <div class="chat-main">
-        <div class="chat-head">
-          <span class="label">model</span>
-          <input type="text" id="chat-model" list="model-list" placeholder="llama3.1:8b" autocomplete="off" style="width:180px">
+        <div class="chat-toolbar">
+          <span class="field-label">Model</span>
+          <input type="text" id="chat-model" list="model-list" placeholder="llama3.2:3b" autocomplete="off" style="width:190px">
           <datalist id="model-list"></datalist>
-          <span class="label">mode</span>
-          <select id="chat-mode">
-            <option value="single">single (stream)</option>
-            <option value="racing">racing</option>
-            <option value="quorum">quorum</option>
-            <option value="ensemble">ensemble</option>
+          <span class="field-label">Mode</span>
+          <select id="chat-mode" class="select">
+            <option value="single">Single (stream)</option>
+            <option value="racing">Racing</option>
+            <option value="quorum">Quorum</option>
+            <option value="ensemble">Ensemble</option>
           </select>
           <input type="number" id="chat-count" min="2" max="5" value="3" title="peers to fan out to">
-          <span class="grow"></span>
-          <span class="chip"><b id="chat-swarm">0</b> peers online</span>
         </div>
-        <div class="msgs" id="msgs">
-          <div class="chat-empty" id="chat-empty">ask the swarm anything — a peer will serve your completion</div>
-        </div>
-        <div class="chat-input">
-          <textarea id="chat-prompt" placeholder="Ask me anything…  (Enter to send · Shift+Enter for newline)"></textarea>
-          <button type="button" id="chat-send">Send ▸</button>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <!-- ================= NETWORK ================= -->
-  <section id="view-network" style="display:none">
-    <div class="panel">
-      <div class="panel-title"><span>┤ THIS NODE ├</span><span class="aux" id="node-inflight">— / —</span></div>
-      <div class="panel-body">
-        <div class="node-grid">
-          <div>
-            <div class="field">
-              <span class="label">peer id</span><br>
-              <span class="value clickcopy" id="peer-id" title="click to copy full peer id">—</span>
-            </div>
-            <div class="field">
-              <span class="label">listen addrs</span>
-              <ul class="addrs" id="listen-addrs"><li>—</li></ul>
+        <div class="stream" id="stream">
+          <div class="stream-inner" id="msgs"></div>
+        </div>
+
+        <div class="composer-wrap">
+          <div class="composer" id="composer">
+            <div class="chips" id="attach-chips" style="display:none"></div>
+            <div class="row">
+              <button type="button" class="tool" id="attach-btn" title="Attach image or file (PDF, text)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l8.49-8.49"/></svg>
+              </button>
+              <input type="file" id="file-input" multiple accept="image/*,.pdf,.txt,.md,.markdown,.csv,.json,.log,.py,.js,.ts,.rs,.go,.java,.c,.cpp,.h,.sh,.yaml,.yml,.toml,.html,.css" style="display:none">
+              <textarea id="chat-prompt" rows="1" placeholder="Message the swarm…"></textarea>
+              <button type="button" class="send" id="chat-send" title="Send" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+              </button>
             </div>
           </div>
-          <div class="ratio-box">
-            <div class="rlabel">RATIO</div>
-            <div class="ratio-num ratio-good" id="ratio">—</div>
-            <div class="rlabel" id="ratio-hint">seed &gt; leech</div>
+          <div class="hint" id="composer-hint">Enter to send · Shift+Enter for newline · a peer serves your completion — it sees your prompt</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= NETWORK ================= -->
+    <section id="view-network" style="display:none">
+      <div class="net">
+        <div class="card">
+          <div class="card-head"><h3>This node</h3><span class="aux" id="node-inflight">— / —</span></div>
+          <div class="card-body">
+            <div class="node-grid">
+              <div>
+                <div class="kv"><div class="k">Peer ID</div><div class="v clickcopy" id="peer-id" title="click to copy">—</div></div>
+                <div class="kv"><div class="k">Listen addrs</div><ul class="addrs" id="listen-addrs"><li>—</li></ul></div>
+              </div>
+              <div class="ratio-box">
+                <div class="rl">BARTER RATIO</div>
+                <div class="ratio-num ratio-good" id="ratio">—</div>
+                <div class="rl" id="ratio-hint">seed &gt; leech</div>
+              </div>
+            </div>
+            <div class="counters">
+              <div class="counter"><div class="cl">Up · served</div><div class="cv up">▲ <span id="served">—</span></div></div>
+              <div class="counter"><div class="cl">Down · consumed</div><div class="cv down">▼ <span id="consumed">—</span></div></div>
+              <div class="counter"><div class="cl">Capacity</div><div class="cv" style="color:var(--text)"><span id="capacity">—</span> slots</div></div>
+            </div>
+            <div class="rep-wrap">
+              <div class="cl">Reputation · <span id="rep-pct">—</span></div>
+              <div class="repbar"><span id="rep-bar" style="width:0%"></span></div>
+            </div>
           </div>
         </div>
-        <div class="counters">
-          <div class="counter"><span class="label">up (served)</span><br><span class="big up">▲ <span id="served">—</span></span></div>
-          <div class="counter"><span class="label">down (consumed)</span><br><span class="big down">▼ <span id="consumed">—</span></span></div>
-          <div class="counter"><span class="label">capacity</span><br><span class="big" style="color:var(--green)"><span id="capacity">—</span> slots</span></div>
+
+        <div class="card">
+          <div class="card-head"><h3>Seeding</h3><span class="aux" id="offer-count">0 models</span></div>
+          <div class="card-body">
+            <table id="offers-table"><thead><tr><th>Model</th><th>Backend</th></tr></thead><tbody id="offers-body"></tbody></table>
+            <div class="empty" id="offers-empty" style="display:none">No local backends — leech-only.</div>
+          </div>
         </div>
-        <div class="rep-wrap">
-          <span class="label">reputation — <span id="rep-pct">—</span></span>
-          <div class="repbar"><span id="rep-bar" style="width:0%"></span></div>
+
+        <div class="card">
+          <div class="card-head"><h3>Swarm</h3><span class="aux" id="swarm-count">0 peers</span></div>
+          <div class="card-body">
+            <table id="swarm-table"><thead><tr><th>Peer</th><th>Models</th><th class="num">Cap</th><th class="num">Active</th></tr></thead><tbody id="swarm-body"></tbody></table>
+            <div class="empty" id="swarm-empty" style="display:none">No seeders online.</div>
+          </div>
         </div>
       </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-title"><span>┤ SEEDING ├</span><span class="aux" id="offer-count">0 MODELS</span></div>
-      <div class="panel-body">
-        <table id="offers-table"><thead><tr><th>MODEL</th><th>BACKEND</th></tr></thead><tbody id="offers-body"></tbody></table>
-        <div class="empty" id="offers-empty" style="display:none">(no local backends — leech-only)</div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-title"><span>┤ SWARM ├</span><span class="aux" id="swarm-count">PEERS: 0</span></div>
-      <div class="panel-body">
-        <table id="swarm-table"><thead><tr><th>PEER</th><th>MODELS</th><th class="num">CAP</th><th class="num">ACTIVE</th></tr></thead><tbody id="swarm-body"></tbody></table>
-        <div class="empty" id="swarm-empty" style="display:none">(no seeders online)</div>
-      </div>
-    </div>
-  </section>
-
-  <div class="statusbar">
-    <span id="conn-status" class="ok">◉ initializing…</span>
-    <span id="last-poll">—</span>
-  </div>
-  <div class="foot" id="foot">
-    p2ptokens · <a href="https://p2ptokens.com" target="_blank" rel="noopener">p2ptokens.com</a> ·
-    <a href="https://github.com/pur4v/p2ptokens" target="_blank" rel="noopener">GitHub</a> ·
-    <a href="https://p2ptokens.com/privacy" target="_blank" rel="noopener">Privacy</a> ·
-    <a href="https://p2ptokens.com/terms" target="_blank" rel="noopener">Terms</a>
+    </section>
   </div>
 
+  <footer class="statusbar">
+    <span id="conn-status" class="ok">● initializing…</span>
+    <span id="foot">
+      <a href="https://p2ptokens.com" target="_blank" rel="noopener">p2ptokens.com</a> ·
+      <a href="https://github.com/pur4v/p2ptokens" target="_blank" rel="noopener">GitHub</a> ·
+      <span id="last-poll">—</span>
+    </span>
+  </footer>
 </div>
 
 <!-- 18+ AGE GATE -->
 <div class="agegate" id="age-gate" style="display:none">
   <div class="agegate-panel">
-    <div class="panel-title"><span>┤ RESTRICTED ├</span><span class="aux">18+</span></div>
-    <div class="agegate-body">
-      <h2>AGE VERIFICATION — 18+ <span class="cursor">█</span></h2>
-      <p>p2ptokens is intended only for users aged 18 or older. By entering, you confirm you are at least 18 years old (or the age of majority in your jurisdiction) and that you agree to the
-        <a href="https://p2ptokens.com/terms" target="_blank" rel="noopener">Terms of Service</a> and
-        <a href="https://p2ptokens.com/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
-      <div class="agegate-actions">
-        <button type="button" id="age-enter">ENTER — I AM 18+</button>
-        <button type="button" id="age-leave" class="btn-secondary">LEAVE</button>
-      </div>
-      <div class="agegate-legal">// verification stored locally · non-sensitive workloads only — the serving peer sees your prompt</div>
+    <div class="sub">Restricted · 18+</div>
+    <h2>Age verification</h2>
+    <p>p2ptokens is intended only for users aged 18 or older. By entering, you confirm you are at least 18 (or the age of majority in your jurisdiction) and agree to the
+      <a href="https://p2ptokens.com/terms" target="_blank" rel="noopener">Terms</a> and
+      <a href="https://p2ptokens.com/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+    <div class="agegate-actions">
+      <button type="button" id="age-enter" class="btn btn-primary">Enter — I am 18+</button>
+      <button type="button" id="age-leave" class="btn btn-ghost">Leave</button>
     </div>
+    <div class="agegate-legal">Verification stored locally · non-sensitive workloads only — the serving peer sees your prompt.</div>
   </div>
 </div>
 
 <!-- COOKIE CONSENT -->
 <div class="cookiebar" id="cookie-bar" style="display:none">
-  <div class="cookie-text">We use strictly necessary local storage (age, cookie choices, your chat history — all kept in your browser). Optional analytics only with consent. <a href="https://p2ptokens.com/cookies" target="_blank" rel="noopener">Cookie Policy</a></div>
+  <div class="cookie-text">We use strictly necessary local storage (age, cookie choices, chat history — all kept in your browser). Optional analytics only with consent. <a href="https://p2ptokens.com/cookies" target="_blank" rel="noopener">Cookie Policy</a></div>
   <div class="cookie-actions">
-    <button type="button" id="cookie-all">ACCEPT ALL</button>
-    <button type="button" id="cookie-essential" class="btn-secondary">ESSENTIAL ONLY</button>
+    <button type="button" id="cookie-all" class="btn btn-primary">Accept all</button>
+    <button type="button" id="cookie-essential" class="btn btn-ghost">Essential only</button>
   </div>
 </div>
 
@@ -359,19 +435,97 @@
   });
 })();
 
+/* ---- markdown (compact, escape-first, XSS-safe) ---- */
+var Markdown = (function () {
+  "use strict";
+  function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function inline(s) {
+    // operates on already-escaped text
+    s = s.replace(/`([^`]+)`/g, function (_, c) { return "<code>" + c + "</code>"; });
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/(^|[^\w*])\*([^*\n]+)\*(?!\w)/g, "$1<em>$2</em>");
+    s = s.replace(/~~([^~]+)~~/g, "<del>$1</del>");
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      function (_, t, u) { return '<a href="' + u + '" target="_blank" rel="noopener">' + t + "</a>"; });
+    return s;
+  }
+  function codeBlock(lang, code) {
+    var l = lang ? esc(lang) : "code";
+    return '<div class="code"><div class="code-head"><span>' + l +
+      '</span><button class="copy-code" type="button">Copy</button></div><pre><code>' +
+      esc(code.replace(/\n$/, "")) + "</code></pre></div>";
+  }
+  function render(src) {
+    src = (src || "").replace(/\r\n/g, "\n");
+    var blocks = [];
+    // closed fences
+    src = src.replace(/```([^\n`]*)\n?([\s\S]*?)```/g, function (_, lang, code) {
+      blocks.push(codeBlock(lang.trim(), code)); return " CB" + (blocks.length - 1) + " ";
+    });
+    // one unterminated fence (streaming)
+    var open = src.indexOf("```");
+    if (open >= 0) {
+      var after = src.slice(open + 3), nl = after.indexOf("\n");
+      var lang = nl >= 0 ? after.slice(0, nl).trim() : "";
+      var code = nl >= 0 ? after.slice(nl + 1) : "";
+      blocks.push(codeBlock(lang, code));
+      src = src.slice(0, open) + " CB" + (blocks.length - 1) + " ";
+    }
+    var lines = src.split("\n"), out = [], para = [], list = null, i;
+    function flushPara() { if (para.length) { out.push("<p>" + inline(esc(para.join("\n")).replace(/\n/g, "<br>")) + "</p>"); para = []; } }
+    function flushList() { if (list) { out.push("<" + list.tag + ">" + list.items.map(function (t) { return "<li>" + inline(esc(t)) + "</li>"; }).join("") + "</" + list.tag + ">"); list = null; } }
+    function flush() { flushPara(); flushList(); }
+    for (i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      var cb = /^ CB(\d+) $/.exec(ln.trim());
+      if (cb) { flush(); out.push(blocks[+cb[1]]); continue; }
+      if (/^\s*$/.test(ln)) { flush(); continue; }
+      var h = /^(#{1,6})\s+(.*)$/.exec(ln);
+      if (h) { flush(); var lvl = Math.min(h[1].length, 3); out.push("<h" + lvl + ">" + inline(esc(h[2])) + "</h" + lvl + ">"); continue; }
+      if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(ln)) { flush(); out.push("<hr>"); continue; }
+      if (/^\s*>\s?/.test(ln)) { flushPara(); flushList(); out.push("<blockquote>" + inline(esc(ln.replace(/^\s*>\s?/, ""))) + "</blockquote>"); continue; }
+      // table: header row + separator
+      if (/\|/.test(ln) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1]) && /-/.test(lines[i + 1])) {
+        flush();
+        var head = ln.split("|").map(function (c) { return c.trim(); }).filter(function (c, idx, a) { return !(c === "" && (idx === 0 || idx === a.length - 1)); });
+        i += 2; var rows = [];
+        while (i < lines.length && /\|/.test(lines[i]) && !/^\s*$/.test(lines[i])) {
+          rows.push(lines[i].split("|").map(function (c) { return c.trim(); }).filter(function (c, idx, a) { return !(c === "" && (idx === 0 || idx === a.length - 1)); }));
+          i++;
+        }
+        i--;
+        var t = "<table><thead><tr>" + head.map(function (c) { return "<th>" + inline(esc(c)) + "</th>"; }).join("") + "</tr></thead><tbody>";
+        t += rows.map(function (r) { return "<tr>" + r.map(function (c) { return "<td>" + inline(esc(c)) + "</td>"; }).join("") + "</tr>"; }).join("");
+        out.push(t + "</tbody></table>"); continue;
+      }
+      var ol = /^\s*(\d+)\.\s+(.*)$/.exec(ln), ul = /^\s*[-*+]\s+(.*)$/.exec(ln);
+      if (ol || ul) {
+        var tag = ol ? "ol" : "ul", txt = ol ? ol[2] : ul[1];
+        flushPara();
+        if (!list || list.tag !== tag) { flushList(); list = { tag: tag, items: [] }; }
+        list.items.push(txt); continue;
+      }
+      flushList(); para.push(ln);
+    }
+    flush();
+    return out.join("\n");
+  }
+  return { render: render, esc: esc };
+})();
+
 /* ---- main app ---- */
 (function () {
   "use strict";
   var fullPeerId = "";
   function $(id) { return document.getElementById(id); }
+  function esc(s) { return Markdown.esc(s); }
   function fmt(n) { if (n == null || isNaN(n)) return "—"; return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
   function truncId(id) { if (!id) return "—"; return id.length <= 16 ? id : id.slice(0, 10) + "…" + id.slice(-4); }
-  function setText(id, t) { $(id).textContent = t; }
-  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+  function setText(id, t) { var e = $(id); if (e) e.textContent = t; }
 
   /* ---------- tabs ---------- */
   function showTab(name) {
-    $("view-chat").style.display = (name === "chat") ? "" : "none";
+    $("view-chat").style.display = (name === "chat") ? "grid" : "none";
     $("view-network").style.display = (name === "network") ? "" : "none";
     $("tab-btn-chat").classList.toggle("active", name === "chat");
     $("tab-btn-network").classList.toggle("active", name === "network");
@@ -380,22 +534,22 @@
   $("tab-btn-network").addEventListener("click", function () { showTab("network"); });
 
   /* ---------- copy peer id ---------- */
+  function copyText(t, cb) {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(cb, cb); }
+    else { var ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); } catch (e) {} document.body.removeChild(ta); cb(); }
+  }
   $("peer-id").addEventListener("click", function () {
     if (!fullPeerId) return;
     var el = $("peer-id"), restore = el.textContent;
-    function done() { el.classList.add("copied"); el.textContent = "copied ✓";
-      setTimeout(function () { el.classList.remove("copied"); el.textContent = restore; }, 900); }
-    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(fullPeerId).then(done, done); }
-    else { var ta = document.createElement("textarea"); ta.value = fullPeerId; document.body.appendChild(ta); ta.select();
-      try { document.execCommand("copy"); } catch (e) {} document.body.removeChild(ta); done(); }
+    copyText(fullPeerId, function () { el.textContent = "copied ✓"; setTimeout(function () { el.textContent = restore; }, 900); });
   });
 
   /* ---------- network render ---------- */
   var knownModels = [];
   function render(d) {
     fullPeerId = d.peer_id || "";
-    var pe = $("peer-id"); pe.textContent = truncId(fullPeerId);
-    pe.title = fullPeerId ? ("click to copy: " + fullPeerId) : "";
+    var pe = $("peer-id"); pe.textContent = truncId(fullPeerId); pe.title = fullPeerId ? ("click to copy: " + fullPeerId) : "";
 
     var ul = $("listen-addrs"); ul.innerHTML = "";
     var addrs = d.listen_addrs || [];
@@ -408,7 +562,7 @@
     if (isInf) { rEl.textContent = "∞"; cls = "ratio-good"; hint = "pure seeder"; }
     else { var rv = Number(r); rEl.textContent = isNaN(rv) ? "—" : rv.toFixed(2);
       if (rv >= 1) { cls = "ratio-good"; hint = "healthy seeder"; }
-      else if (rv >= 0.5) { cls = "ratio-warn"; hint = "seed more!"; }
+      else if (rv >= 0.5) { cls = "ratio-warn"; hint = "seed more"; }
       else { cls = "ratio-bad"; hint = "leech — throttled"; } }
     rEl.className = "ratio-num " + cls; setText("ratio-hint", hint);
 
@@ -420,26 +574,25 @@
     $("rep-bar").style.width = (rep * 100).toFixed(0) + "%"; setText("rep-pct", (rep * 100).toFixed(0) + "%");
 
     var offers = d.offers || [], ob = $("offers-body"); ob.innerHTML = "";
-    setText("offer-count", offers.length + " MODEL" + (offers.length === 1 ? "" : "S"));
+    setText("offer-count", offers.length + " model" + (offers.length === 1 ? "" : "s"));
     if (!offers.length) { $("offers-table").style.display = "none"; $("offers-empty").style.display = "block"; }
     else { $("offers-table").style.display = ""; $("offers-empty").style.display = "none";
       offers.forEach(function (o) { var tr = document.createElement("tr");
-        tr.innerHTML = "<td>" + esc(o.model) + "</td><td>" + esc(o.backend) + "</td>"; ob.appendChild(tr); }); }
+        tr.innerHTML = "<td class=\"mono\">" + esc(o.model) + "</td><td>" + esc(o.backend) + "</td>"; ob.appendChild(tr); }); }
 
     var swarm = d.swarm || [];
     var peers = (d.swarm_size == null ? swarm.length : d.swarm_size);
-    setText("swarm-count", "PEERS: " + peers);
+    setText("swarm-count", peers + " peer" + (peers === 1 ? "" : "s"));
     setText("api-peers", peers); setText("chat-swarm", peers);
     var sb = $("swarm-body"); sb.innerHTML = "";
     if (!swarm.length) { $("swarm-table").style.display = "none"; $("swarm-empty").style.display = "block"; }
     else { $("swarm-table").style.display = ""; $("swarm-empty").style.display = "none";
       swarm.forEach(function (p) { var models = (p.models || []).join(", "); var tr = document.createElement("tr");
-        tr.innerHTML = "<td title=\"" + esc(p.peer_id) + "\">" + esc(truncId(p.peer_id)) + "</td>" +
+        tr.innerHTML = "<td class=\"mono\" title=\"" + esc(p.peer_id) + "\">" + esc(truncId(p.peer_id)) + " <span class=\"badge\">signed</span></td>" +
           "<td>" + esc(models || "—") + "</td>" +
           "<td class=\"num\">" + (p.capacity == null ? "—" : p.capacity) + "</td>" +
           "<td class=\"num\">" + (p.in_flight == null ? "—" : p.in_flight) + "</td>"; sb.appendChild(tr); }); }
 
-    // model list for chat (network-wide)
     var set = {};
     swarm.forEach(function (p) { (p.models || []).forEach(function (m) { set[m] = 1; }); });
     offers.forEach(function (o) { set[o.model] = 1; });
@@ -451,15 +604,15 @@
   }
 
   function setConn(ok, msg) {
-    var el = $("conn-status");
-    if (ok) { el.className = "ok"; el.textContent = "◉ " + (msg || "connected — polling /api/status"); }
-    else { el.className = "fail"; el.textContent = "✕ " + (msg || "coordinator/daemon unreachable — retrying"); }
+    var el = $("conn-status"), dot = $("conn-dot");
+    if (ok) { el.className = "ok"; el.textContent = "● " + (msg || "connected"); dot.className = "dot"; }
+    else { el.className = "fail"; el.textContent = "● " + (msg || "daemon unreachable — retrying"); dot.className = "dot off"; }
   }
   function poll() {
     fetch("/api/status", { cache: "no-store" })
       .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
-      .then(function (d) { render(d); setConn(true); setText("last-poll", "last poll " + new Date().toLocaleTimeString()); })
-      .catch(function (e) { setConn(false, "coordinator/daemon unreachable — retrying (" + e.message + ")"); });
+      .then(function (d) { render(d); setConn(true); setText("last-poll", "updated " + new Date().toLocaleTimeString()); })
+      .catch(function (e) { setConn(false, "daemon unreachable — retrying"); });
   }
 
   /* ---------- conversations (localStorage) ---------- */
@@ -470,8 +623,9 @@
   function saveConvos() { try { localStorage.setItem(CONVO_KEY, JSON.stringify(convos)); } catch (e) {} }
   function current() { return convos.filter(function (c) { return c.id === currentId; })[0] || null; }
   function newConvo() {
-    var c = { id: "c" + Date.now(), title: "new chat", created: Date.now(), messages: [] };
+    var c = { id: "c" + Date.now(), title: "New chat", created: Date.now(), messages: [] };
     convos.unshift(c); currentId = c.id; saveConvos(); renderConvos(); renderThread();
+    $("chat-prompt").focus();
   }
   function deleteConvo(id) {
     convos = convos.filter(function (c) { return c.id !== id; });
@@ -484,192 +638,373 @@
     convos.forEach(function (c) {
       var li = document.createElement("li");
       li.className = "convo" + (c.id === currentId ? " active" : "");
-      li.innerHTML = "<span class=\"cdel\" title=\"delete\">✕</span>" +
-        "<div class=\"ctitle\">" + esc(c.title || "chat") + "</div>" +
-        "<div class=\"cmeta\">" + (c.messages.length) + " msg · " + new Date(c.created).toLocaleString() + "</div>";
+      li.innerHTML = "<span class=\"ctitle\">" + esc(c.title || "Chat") + "</span><span class=\"cdel\" title=\"delete\">×</span>";
       li.addEventListener("click", function () { currentId = c.id; renderConvos(); renderThread(); });
       li.querySelector(".cdel").addEventListener("click", function (ev) { ev.stopPropagation(); deleteConvo(c.id); });
       ul.appendChild(li);
     });
   }
-  // split a <think>...</think> block out of assistant content
+
+  /* ---------- content helpers ---------- */
+  function contentToText(content) {
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) return content.filter(function (p) { return p.type === "text"; }).map(function (p) { return p.text; }).join("\n");
+    return "";
+  }
   function splitThink(text) {
     var m = /^\s*<think>([\s\S]*?)<\/think>\s*/i.exec(text || "");
     if (m) return { think: m[1].trim(), body: text.slice(m[0].length) };
     return { think: null, body: text || "" };
   }
-  function bubbleHtml(content, provider, extraMeta) {
+  function assistantHtml(content) {
     var parts = splitThink(content);
     var html = "";
-    if (parts.think) {
-      html += "<details class=\"think\"><summary>⟨ thinking ⟩</summary><div class=\"tbody\">" + esc(parts.think) + "</div></details>";
-    }
-    html += "<div class=\"bubble" + (extraMeta ? " multi" : "") + "\">" + esc(parts.body || "…") + "</div>";
-    var meta = [];
-    if (provider) meta.push("served by <b title=\"" + esc(provider) + "\">" + esc(truncId(provider)) + "</b>");
-    if (extraMeta) meta.push(extraMeta);
-    if (meta.length) html += "<div class=\"bmeta\">◄ " + meta.join(" · ") + "</div>";
+    if (parts.think) html += "<details class=\"think\"><summary>Thinking</summary><div class=\"tbody\">" + esc(parts.think) + "</div></details>";
+    html += Markdown.render(parts.body || "");
     return html;
   }
+  function userHtml(content) {
+    var html = "";
+    var atts = "";
+    if (Array.isArray(content)) {
+      content.forEach(function (p) {
+        if (p.type === "image_url") atts += "<img class=\"att-thumb\" src=\"" + esc(p.image_url.url) + "\" alt=\"image\">";
+        else if (p.type === "file") atts += "<div class=\"att-file\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\"/><path d=\"M14 2v6h6\"/></svg><span class=\"fn\">" + esc(p.file.filename || "file") + "</span></div>";
+      });
+    }
+    if (atts) html += "<div class=\"attach-grid\">" + atts + "</div>";
+    var txt = contentToText(content);
+    if (txt) html += "<div>" + esc(txt).replace(/\n/g, "<br>") + "</div>";
+    return html || "<div class=\"faint\">(empty)</div>";
+  }
+
+  function turnEl(role, innerHtml, opts) {
+    opts = opts || {};
+    var div = document.createElement("div");
+    div.className = "turn " + role;
+    var av = role === "user" ? "You" : "AI";
+    var meta = "";
+    if (opts.provider) meta += "<span class=\"prov\">served by <b>" + esc(truncId(opts.provider)) + "</b></span>";
+    if (opts.extraMeta) meta += "<span class=\"prov\">" + opts.extraMeta + "</span>";
+    var actions = "";
+    if (role === "assistant" && !opts.live) {
+      actions = "<span class=\"actions\">" +
+        "<button class=\"iconbtn act-copy\" type=\"button\">Copy</button>" +
+        (opts.canRegen ? "<button class=\"iconbtn act-regen\" type=\"button\">Regenerate</button>" : "") +
+        "</span>";
+    }
+    div.innerHTML =
+      "<div class=\"avatar\">" + av + "</div>" +
+      "<div class=\"body\"><div class=\"role\">" + (role === "user" ? "You" : "Assistant") + "</div>" +
+      "<div class=\"content\">" + innerHtml + "</div>" +
+      "<div class=\"meta\">" + meta + actions + "</div></div>";
+    return div;
+  }
+
   function renderThread() {
     var box = $("msgs"); box.innerHTML = "";
     var c = current();
     if (!c || !c.messages.length) {
-      box.innerHTML = "<div class=\"chat-empty\" id=\"chat-empty\">ask the swarm anything — a peer will serve your completion</div>";
+      box.innerHTML =
+        "<div class=\"empty-state\">" +
+        "<svg class=\"es-logo\" viewBox=\"0 0 32 32\" fill=\"none\"><circle cx=\"16\" cy=\"6\" r=\"3.4\" fill=\"var(--accent)\"/><circle cx=\"6.5\" cy=\"24\" r=\"3.4\" fill=\"var(--accent)\"/><circle cx=\"25.5\" cy=\"24\" r=\"3.4\" fill=\"var(--accent)\"/><path d=\"M16 8.5 L8 21.5 M16 8.5 L24 21.5 M9 24 H23\" stroke=\"var(--accent)\" stroke-width=\"1.7\" stroke-linecap=\"round\" opacity=\".65\"/></svg>" +
+        "<h1>Ask the swarm anything</h1><p>A peer serves your completion, end-to-end. Attach an image or PDF with the clip.</p></div>";
       return;
     }
-    c.messages.forEach(function (m) {
-      var div = document.createElement("div");
-      div.className = "msg " + (m.role === "user" ? "user" : "assistant");
-      var who = m.role === "user" ? "You" : "Assistant";
-      var inner = "<div class=\"who\">" + who + "</div>";
+    c.messages.forEach(function (m, idx) {
+      var lastUser = (m.role === "assistant" && idx === c.messages.length - 1);
       if (m.role === "assistant" && m.choices && m.choices.length > 1) {
-        // ensemble: multiple provider answers
-        m.choices.forEach(function (ch, i) {
-          inner += "<div class=\"label\" style=\"margin-top:6px\">choice " + (i + 1) + "</div>" + bubbleHtml(ch.content, ch.provider, null);
-        });
-        if (m.meta) inner += "<div class=\"bmeta\">⇄ " + m.meta + "</div>";
+        var inner = "";
+        m.choices.forEach(function (ch, i) { inner += "<div class=\"choice-label\">Choice " + (i + 1) + (ch.provider ? " · " + esc(truncId(ch.provider)) : "") + "</div>" + assistantHtml(ch.content); });
+        box.appendChild(turnEl("assistant", inner, { extraMeta: m.meta, canRegen: lastUser }));
+      } else if (m.role === "assistant") {
+        box.appendChild(turnEl("assistant", assistantHtml(m.content), { provider: m.provider, extraMeta: m.meta, canRegen: lastUser }));
       } else {
-        inner += bubbleHtml(m.content, m.provider, m.meta);
+        box.appendChild(turnEl("user", userHtml(m.content)));
       }
-      div.innerHTML = inner;
-      box.appendChild(div);
     });
-    box.scrollTop = box.scrollHeight;
+    bindMsgActions();
+    scrollBottom(true);
   }
+
+  function bindMsgActions() {
+    var box = $("msgs");
+    Array.prototype.forEach.call(box.querySelectorAll(".copy-code"), function (b) {
+      b.addEventListener("click", function () {
+        var code = b.parentElement.parentElement.querySelector("code");
+        copyText(code ? code.textContent : "", function () { var t = b.textContent; b.textContent = "Copied"; setTimeout(function () { b.textContent = t; }, 900); });
+      });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll(".act-copy"), function (b) {
+      b.addEventListener("click", function () {
+        var content = b.closest(".turn").querySelector(".content");
+        copyText(content ? content.innerText : "", function () { var t = b.textContent; b.textContent = "Copied"; setTimeout(function () { b.textContent = t; }, 900); });
+      });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll(".act-regen"), function (b) {
+      b.addEventListener("click", regenerate);
+    });
+  }
+
+  /* ---------- scrolling ---------- */
+  var stick = true;
+  var streamEl = $("stream");
+  streamEl.addEventListener("scroll", function () {
+    stick = (streamEl.scrollHeight - streamEl.scrollTop - streamEl.clientHeight) < 80;
+  });
+  function scrollBottom(force) { if (force || stick) { streamEl.scrollTop = streamEl.scrollHeight; } }
+
+  /* ---------- attachments ---------- */
+  var pending = []; // { kind:'image'|'file', name, part }
+  var MAX_BYTES = 5 * 1024 * 1024;
+  function readFile(file) {
+    return new Promise(function (resolve, reject) {
+      if (file.size > MAX_BYTES) { reject(new Error(file.name + " is larger than 5 MB")); return; }
+      var fr = new FileReader();
+      fr.onload = function () { resolve(fr.result); };
+      fr.onerror = function () { reject(new Error("could not read " + file.name)); };
+      fr.readAsDataURL(file);
+    });
+  }
+  function addFiles(files) {
+    var arr = Array.prototype.slice.call(files);
+    arr.reduce(function (p, f) {
+      return p.then(function () {
+        return readFile(f).then(function (dataUrl) {
+          if (f.type && f.type.indexOf("image/") === 0) {
+            pending.push({ kind: "image", name: f.name, url: dataUrl, part: { type: "image_url", image_url: { url: dataUrl } } });
+          } else {
+            pending.push({ kind: "file", name: f.name, part: { type: "file", file: { filename: f.name, mime: f.type || "", data: dataUrl } } });
+          }
+          renderChips(); updateSendState();
+        });
+      }).catch(function (e) { showHintError(e.message); });
+    }, Promise.resolve());
+  }
+  function renderChips() {
+    var box = $("attach-chips");
+    box.innerHTML = "";
+    box.style.display = pending.length ? "flex" : "none";
+    pending.forEach(function (a, i) {
+      var chip = document.createElement("div");
+      chip.className = "chip";
+      chip.innerHTML = (a.kind === "image" ? "<img src=\"" + esc(a.url) + "\">" : "") +
+        "<span class=\"fn\">" + esc(a.name) + "</span><span class=\"x\" title=\"remove\">×</span>";
+      chip.querySelector(".x").addEventListener("click", function () { pending.splice(i, 1); renderChips(); updateSendState(); });
+      box.appendChild(chip);
+    });
+  }
+  $("attach-btn").addEventListener("click", function () { $("file-input").click(); });
+  $("file-input").addEventListener("change", function (e) { addFiles(e.target.files); e.target.value = ""; });
+
+  // paste image
+  $("chat-prompt").addEventListener("paste", function (e) {
+    var items = (e.clipboardData || {}).items || [];
+    var imgs = [];
+    for (var i = 0; i < items.length; i++) { if (items[i].type && items[i].type.indexOf("image/") === 0) { var f = items[i].getAsFile(); if (f) imgs.push(f); } }
+    if (imgs.length) { e.preventDefault(); addFiles(imgs); }
+  });
+  // drag & drop
+  var comp = $("composer");
+  ["dragenter", "dragover"].forEach(function (ev) { comp.addEventListener(ev, function (e) { e.preventDefault(); comp.classList.add("drag"); }); });
+  ["dragleave", "drop"].forEach(function (ev) { comp.addEventListener(ev, function (e) { e.preventDefault(); if (ev === "drop" || e.target === comp) comp.classList.remove("drag"); }); });
+  comp.addEventListener("drop", function (e) { if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+  /* ---------- composer state ---------- */
+  var prompt = $("chat-prompt");
+  function autogrow() { prompt.style.height = "auto"; prompt.style.height = Math.min(prompt.scrollHeight, 200) + "px"; }
+  prompt.addEventListener("input", function () { autogrow(); updateSendState(); });
+  function updateSendState() {
+    if (sending) return;
+    var has = prompt.value.trim().length > 0 || pending.length > 0;
+    $("chat-send").disabled = !has;
+  }
+  var hintDefault = $("composer-hint").innerHTML;
+  function showHintError(msg) { $("composer-hint").innerHTML = "<span class=\"err\">" + esc(msg) + "</span>"; setTimeout(function () { $("composer-hint").innerHTML = hintDefault; }, 4000); }
+
+  // advanced count visibility
+  function syncCount() { $("chat-count").style.display = ($("chat-mode").value === "single") ? "none" : ""; }
+  $("chat-mode").addEventListener("change", syncCount);
 
   /* ---------- sending ---------- */
   var sending = false;
-  function scrollMsgs() { var b = $("msgs"); b.scrollTop = b.scrollHeight; }
+  var abortCtl = null;
+  var rafPending = false;
 
-  async function streamSingle(model, messages, liveEl) {
+  function buildContent(text) {
+    if (!pending.length) return text;
+    var parts = [];
+    if (text) parts.push({ type: "text", text: text });
+    pending.forEach(function (a) { parts.push(a.part); });
+    return parts;
+  }
+
+  function liveRender(el, acc) {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(function () {
+      rafPending = false;
+      el.innerHTML = assistantHtml(acc) + "<span class=\"caret\"></span>";
+      Array.prototype.forEach.call(el.querySelectorAll(".copy-code"), function (b) { b.style.display = "none"; });
+      scrollBottom();
+    });
+  }
+
+  async function streamCompletion(model, messages, mode, count, liveEl) {
+    abortCtl = new AbortController();
+    var body = { model: model, messages: messages, stream: true };
+    if (mode === "racing") { body.fanout = "racing"; body.fanout_count = count; }
     var r = await fetch("/v1/chat/completions", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: model, messages: messages, stream: true })
+      body: JSON.stringify(body), signal: abortCtl.signal
     });
-    if (!r.ok || !r.body) { var j = await r.json().catch(function () { return {}; });
-      throw new Error((j.error && j.error.message) || ("HTTP " + r.status)); }
-    var reader = r.body.getReader(), dec = new TextDecoder(), buf = "", acc = "";
+    if (!r.ok || !r.body) { var j = await r.json().catch(function () { return {}; }); throw new Error((j.error && j.error.message) || ("HTTP " + r.status)); }
+    var reader = r.body.getReader(), dec = new TextDecoder(), buf = "", acc = "", prov = "";
     while (true) {
       var res = await reader.read(); if (res.done) break;
       buf += dec.decode(res.value, { stream: true });
       var idx;
       while ((idx = buf.indexOf("\n\n")) >= 0) {
         var line = buf.slice(0, idx).trim(); buf = buf.slice(idx + 2);
-        if (!line.indexOf("data:") === 0 && line.indexOf("data:") !== 0) continue;
         if (line.indexOf("data:") !== 0) continue;
         var data = line.slice(5).trim();
-        if (data === "[DONE]") return acc;
-        try { var o = JSON.parse(data);
+        if (data === "[DONE]") return { text: acc, provider: prov };
+        try {
+          var o = JSON.parse(data);
           if (o.error) throw new Error(o.error.message || "stream error");
           var d = o.choices && o.choices[0] && o.choices[0].delta;
-          if (d && d.content) { acc += d.content; liveEl.innerHTML = esc(acc); scrollMsgs(); }
+          if (d && d.content) { acc += d.content; liveRender(liveEl, acc); }
         } catch (e) { if (e instanceof Error && /stream error/.test(e.message)) throw e; }
       }
     }
-    return acc;
+    return { text: acc, provider: prov };
+  }
+
+  async function bufferedFanout(model, messages, mode, count) {
+    var r = await fetch("/v1/chat/completions", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: model, messages: messages, fanout: mode, fanout_count: count })
+    });
+    var j = await r.json();
+    if (!r.ok || j.error) throw new Error((j.error && j.error.message) || ("HTTP " + r.status));
+    var choices = (j.choices || []).map(function (ch) { return { content: (ch.message && ch.message.content) || "", provider: ch.p2p_provider || (j.p2p_provider || "") }; });
+    var meta = "";
+    if (j.p2p_fanout) { var f = j.p2p_fanout; meta = "mode " + esc(f.mode) + " · " + f.responded + " peer(s)"; if (f.agreement != null) meta += " · " + f.agreement + " agreed"; }
+    return { choices: choices, meta: meta };
+  }
+
+  function setSending(on) {
+    sending = on;
+    var btn = $("chat-send");
+    if (on) {
+      btn.disabled = false; btn.classList.add("stop"); btn.title = "Stop";
+      btn.innerHTML = "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"2\"/></svg>";
+    } else {
+      btn.classList.remove("stop"); btn.title = "Send";
+      btn.innerHTML = "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z\"/></svg>";
+      updateSendState();
+    }
+  }
+
+  async function runCompletion(c, model, mode, count) {
+    var history = c.messages.filter(function (m) { return m.role === "user" || m.role === "assistant"; })
+      .map(function (m) { return { role: m.role, content: m.content }; });
+
+    setSending(true);
+    var box = $("msgs");
+    var holder = turnEl("assistant", "<span class=\"caret\"></span>", { live: true });
+    box.appendChild(holder); scrollBottom(true);
+    var live = holder.querySelector(".content");
+
+    try {
+      if (mode === "single" || mode === "racing") {
+        var out = await streamCompletion(model, history, mode, count, live);
+        c.messages.push({ role: "assistant", content: out.text || "(no content)", provider: out.provider || "" });
+      } else {
+        live.innerHTML = "<span class=\"faint\">Querying " + count + " peers…</span>";
+        var fo = await bufferedFanout(model, history, mode, count);
+        if (mode === "ensemble") c.messages.push({ role: "assistant", content: fo.choices[0] ? fo.choices[0].content : "", choices: fo.choices, meta: fo.meta });
+        else { var ch0 = fo.choices[0] || { content: "(no content)", provider: "" }; c.messages.push({ role: "assistant", content: ch0.content, provider: ch0.provider, meta: fo.meta }); }
+      }
+      saveConvos(); renderThread();
+    } catch (e) {
+      if (e && e.name === "AbortError") {
+        var acc = live.innerText.replace(/\s*$/, "");
+        c.messages.push({ role: "assistant", content: acc || "(stopped)", provider: "" });
+        saveConvos(); renderThread();
+      } else {
+        live.innerHTML = "<span class=\"hint err\">✕ " + esc((e && e.message) || "request failed") + "</span>";
+        saveConvos();
+      }
+    } finally {
+      abortCtl = null; setSending(false); renderConvos();
+    }
   }
 
   async function send() {
-    if (sending) return;
-    var text = $("chat-prompt").value.trim();
-    if (!text) return;
-    var model = $("chat-model").value.trim() || $("chat-model").placeholder || "llama3.1:8b";
+    if (sending) { if (abortCtl) abortCtl.abort(); return; }
+    var text = prompt.value.trim();
+    if (!text && !pending.length) return;
+    var model = $("chat-model").value.trim() || $("chat-model").placeholder || "llama3.2:3b";
     var mode = $("chat-mode").value;
     var count = parseInt($("chat-count").value, 10) || 3;
 
     if (!current()) newConvo();
     var c = current();
-    c.messages.push({ role: "user", content: text });
-    if (c.messages.length === 1 || c.title === "new chat") c.title = text.slice(0, 40);
-    $("chat-prompt").value = "";
+    var content = buildContent(text);
+    c.messages.push({ role: "user", content: content });
+    if (c.messages.length === 1 || c.title === "New chat") c.title = (text || "Attachment").slice(0, 42);
+    prompt.value = ""; autogrow();
+    pending = []; renderChips();
     saveConvos(); renderConvos(); renderThread();
 
-    // history for context: role/content only
-    var history = c.messages.map(function (m) { return { role: m.role, content: m.content }; });
+    await runCompletion(c, model, mode, count);
+  }
 
-    sending = true; $("chat-send").disabled = true;
-    // placeholder assistant bubble
-    var box = $("msgs");
-    var holder = document.createElement("div");
-    holder.className = "msg assistant";
-    holder.innerHTML = "<div class=\"who\">Assistant · " + esc(mode) + "</div><div class=\"bubble\" id=\"live-bubble\">…requesting from the swarm…</div>";
-    box.appendChild(holder); scrollMsgs();
-    var live = $("live-bubble");
-
-    try {
-      if (mode === "single") {
-        var acc = await streamSingle(model, history, live);
-        c.messages.push({ role: "assistant", content: acc || "(no content)" });
-      } else {
-        var r = await fetch("/v1/chat/completions", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: model, messages: history, fanout: mode, fanout_count: count })
-        });
-        var j = await r.json();
-        if (!r.ok || j.error) throw new Error((j.error && j.error.message) || ("HTTP " + r.status));
-        var choices = (j.choices || []).map(function (ch) {
-          return { content: (ch.message && ch.message.content) || "", provider: ch.p2p_provider || (j.p2p_provider || "") };
-        });
-        var meta = "";
-        if (j.p2p_fanout) { var f = j.p2p_fanout;
-          meta = "mode <b>" + esc(f.mode) + "</b> · <b>" + f.responded + "</b> peer(s)";
-          if (f.agreement != null) meta += " · <b>" + f.agreement + "</b> agreed"; }
-        if (mode === "ensemble") {
-          c.messages.push({ role: "assistant", content: choices[0] ? choices[0].content : "", choices: choices, meta: meta });
-        } else {
-          var ch0 = choices[0] || { content: "(no content)", provider: "" };
-          c.messages.push({ role: "assistant", content: ch0.content, provider: ch0.provider, meta: meta });
-        }
-      }
-      saveConvos(); renderThread();
-    } catch (e) {
-      live.className = "bubble"; live.innerHTML = "<span class=\"err\">✕ " + esc(e.message || "request failed") + "</span>";
-      // keep the user turn; drop the failed assistant turn from storage
-      saveConvos();
-    } finally {
-      sending = false; $("chat-send").disabled = false; renderConvos();
-    }
+  function regenerate() {
+    if (sending) return;
+    var c = current(); if (!c) return;
+    // drop trailing assistant message(s), keep the last user turn
+    while (c.messages.length && c.messages[c.messages.length - 1].role === "assistant") c.messages.pop();
+    if (!c.messages.length) return;
+    saveConvos(); renderThread();
+    var model = $("chat-model").value.trim() || $("chat-model").placeholder || "llama3.2:3b";
+    runCompletion(c, model, $("chat-mode").value, parseInt($("chat-count").value, 10) || 3);
   }
 
   $("chat-send").addEventListener("click", send);
-  $("chat-prompt").addEventListener("keydown", function (ev) {
-    if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); send(); }
-  });
+  prompt.addEventListener("keydown", function (ev) { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); send(); } });
   $("new-chat").addEventListener("click", newConvo);
 
-  // white-label: re-skin from /api/config (product name, tagline, colors, links, logo)
+  /* ---------- white-label ---------- */
   function applyBrand() {
     fetch("/api/config", { cache: "no-store" })
       .then(function (r) { return r.json(); })
       .then(function (b) {
         if (!b) return;
         var name = b.product_name || "p2ptokens";
-        document.title = name + " // " + (b.network || "swarm");
+        document.title = name;
         var rs = document.documentElement.style;
-        if (b.accent) { rs.setProperty("--green", b.accent); rs.setProperty("--green-dim", b.accent); }
-        if (b.amber) { rs.setProperty("--amber", b.amber); }
-        var tl = document.querySelector(".tagline");
-        if (tl && b.tagline) tl.innerHTML = "// " + esc(b.tagline) + " // <span class=\"cursor\">█</span>";
-        if (b.logo_url) {
-          var ban = $("banner");
-          if (ban) { var img = document.createElement("img"); img.src = b.logo_url; img.alt = name; img.style.maxWidth = "480px"; img.style.display = "block"; ban.replaceWith(img); }
-        }
+        if (b.accent) { rs.setProperty("--accent", b.accent); rs.setProperty("--accent-2", b.accent); }
+        if (b.amber) rs.setProperty("--amber", b.amber);
+        var nm = $("brand-name");
+        if (nm) { if (name.toLowerCase() === "p2ptokens") nm.innerHTML = "p2p<b>tokens</b>"; else nm.textContent = name; }
+        if (b.logo_url) { var lg = $("brand-logo"); if (lg) { var img = document.createElement("img"); img.src = b.logo_url; img.alt = name; img.className = "logo"; lg.replaceWith(img); } }
         var web = b.website || "", gh = b.github || "", foot = $("foot");
         if (foot) {
-          var parts = [esc(name)];
+          var parts = [];
           if (web) parts.push('<a href="' + esc(web) + '" target="_blank" rel="noopener">' + esc(web.replace(/^https?:\/\//, "")) + '</a>');
           if (gh) parts.push('<a href="' + esc(gh) + '" target="_blank" rel="noopener">GitHub</a>');
-          if (web) { parts.push('<a href="' + esc(web) + '/privacy" target="_blank" rel="noopener">Privacy</a>'); parts.push('<a href="' + esc(web) + '/terms" target="_blank" rel="noopener">Terms</a>'); }
+          parts.push('<span id="last-poll">—</span>');
           foot.innerHTML = parts.join(" · ");
         }
       })
       .catch(function () {});
   }
 
-  // init
+  /* ---------- init ---------- */
   if (convos.length) currentId = convos[0].id;
-  renderConvos(); renderThread();
+  renderConvos(); renderThread(); syncCount(); autogrow(); updateSendState();
   applyBrand();
   poll(); setInterval(poll, 2000);
 })();
