@@ -32,11 +32,11 @@
   <!-- CONTROL PLANE (amber dashed) coordinator <-> peers -->
   <g stroke="#ffb000" stroke-width="1.8" stroke-dasharray="6 5" fill="none" opacity="0.85">
     <path d="M175 440 C 260 300, 340 240, 400 206" marker-end="url(#aa)"/>
-    <path d="M500 206 L 500 300" marker-end="url(#aa)"/>
+    <path d="M520 466 C 512 380, 506 300, 500 208" marker-end="url(#aa)"/>
     <path d="M825 360 C 720 300, 640 250, 600 206" marker-end="url(#aa)"/>
   </g>
   <text x="300" y="270" fill="#ffb000" font-size="11" transform="rotate(-32 300 270)">match</text>
-  <text x="512" y="262" fill="#ffb000" font-size="11">heartbeat</text>
+  <text x="530" y="338" fill="#ffb000" font-size="11">heartbeat</text>
   <text x="672" y="262" fill="#ffb000" font-size="11" transform="rotate(30 672 262)">settle</text>
   <!-- (control-plane explanation lives in the legend, top-left) -->
 
@@ -93,8 +93,8 @@
     <path d="M620 512 C 690 520, 720 470, 742 452"/>
     <path d="M620 540 L 648 585"/>
   </g>
-  <text x="360" y="390" fill="#33ff88" font-size="12">data plane — libp2p (Noise/Yamux)</text>
-  <text x="360" y="408" fill="#4f7a63" font-size="11">completion tokens + signed co-receipts, peer-to-peer</text>
+  <!-- data-plane explanation is in the legend (top-left); the green arrows are the P2P streams -->
+  <text x="326" y="452" fill="#4f7a63" font-size="11">libp2p stream ▸</text>
 
   <!-- CAPTION -->
   <rect x="34" y="642" width="946" height="34" rx="8" fill="#0e140e" stroke="#1f5a3a"/>
@@ -104,7 +104,7 @@
   <g font-size="11">
     <rect x="34" y="86" width="300" height="62" rx="8" fill="#0e140e" stroke="#1f5a3a"/>
     <line x1="48" y1="110" x2="82" y2="110" stroke="#33ff88" stroke-width="2.6" filter="url(#glow)"/>
-    <text x="92" y="114" fill="#9fe6bd">P2P data — tokens + co-receipts</text>
+    <text x="92" y="114" fill="#9fe6bd">P2P data · libp2p (tokens+receipts)</text>
     <line x1="48" y1="133" x2="82" y2="133" stroke="#ffb000" stroke-width="1.8" stroke-dasharray="6 5"/>
     <text x="92" y="137" fill="#9fe6bd">control — HTTP metadata only</text>
   </g>
