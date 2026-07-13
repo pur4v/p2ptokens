@@ -118,11 +118,14 @@ modes are non-streaming (they coordinate results); `single` still streams.
 
 ## Quick start
 
-Requires [Ollama](https://ollama.com) with a model pulled:
+**Prerequisites:** [Rust](https://rustup.rs), **[Node 20+](https://nodejs.org)**
+(the client bundles a chat web UI that `build.rs` compiles at build time), and
+[Ollama](https://ollama.com) with a model pulled. No Node? Build the daemon
+without the UI by setting `P2P_SKIP_WEB_BUILD=1`.
 
 ```bash
 ollama pull llama3.2:3b
-cargo build
+cargo build          # first build compiles the embedded chat UI (needs Node)
 
 # terminal 1 — the tracker
 target/debug/p2p-coordinator
@@ -134,8 +137,10 @@ target/debug/p2ptokens --http 127.0.0.1:8080 --data-dir ./.p2p/a
 target/debug/p2ptokens --http 127.0.0.1:8081 --data-dir ./.p2p/b
 ```
 
-Open the **dashboard** at <http://127.0.0.1:8081> (ASCII terminal theme), or hit
-the drop-in **`/v1` endpoint** — point any OpenAI-compatible client at
+Open the **chat dashboard** at <http://127.0.0.1:8081> — a full chat UI (streaming,
+markdown + syntax highlighting, image/PDF input, local SQLite history, light/dark)
+plus a live **Network** tab showing your barter ratio and the swarm. Or hit the
+drop-in **`/v1` endpoint** — point any OpenAI-compatible client at
 `http://127.0.0.1:8081/v1`:
 
 ```bash
@@ -174,9 +179,13 @@ curl -fsSL https://p2ptokens.com/install.sh | sh
 # Windows (PowerShell)
 irm https://p2ptokens.com/install.ps1 | iex
 
-# or with Cargo (any OS with Rust)
+# or with Cargo (any OS with Rust + Node 20+ for the client's web UI)
 cargo install --git https://github.com/pur4v/p2ptokens p2ptokens-client p2ptokens-coordinator
 ```
+
+> Prebuilt binaries need nothing extra. Building from source needs **Node 20+**
+> (the client compiles its embedded chat UI); set `P2P_SKIP_WEB_BUILD=1` to build
+> the daemon without the UI. The coordinator has no Node dependency.
 
 Override source/dir with `P2PTOKENS_REPO=owner/repo` and `P2PTOKENS_BIN`. The
 identity keypair lives in the per-OS data dir (override with `--data-dir`).
@@ -250,6 +259,12 @@ p2ptokens --config p2ptokens.toml
 > [!IMPORTANT]
 > v1 coordinator state is in-memory (single instance, no DB yet). Fine for a team;
 > for HA, externalize the registry/ledger to Redis/Postgres (scaling path).
+
+Each client ships the full chat UI + a **local SQLite history** (nothing leaves the
+machine but the prompt it sends to a peer). Full walkthrough + a production security
+checklist: **[p2ptokens.com/docs](https://p2ptokens.com/docs)**. Building the client
+from source on org machines needs **Node 20+** (see [Quick start](#quick-start)) — or
+ship the prebuilt binaries, which need nothing extra.
 
 ---
 
