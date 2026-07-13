@@ -7,8 +7,9 @@ use serde::Deserialize;
 use serde_json::json;
 use tokio::sync::mpsc;
 
+use super::files;
 use super::{estimate_tokens, split_system, AdapterRequest};
-use p2ptokens_shared::types::{ChatMessage, CompletionDelta, ModelId};
+use p2ptokens_shared::types::{ChatMessage, CompletionDelta, ContentPart, MessageContent, ModelId};
 
 pub struct ClaudeAdapter {
     api_key: String,
@@ -69,7 +70,7 @@ impl ClaudeAdapter {
         tx: mpsc::Sender<CompletionDelta>,
     ) -> Result<()> {
         let (system, rest) = split_system(&req.messages);
-        let msgs: Vec<ChatMessage> = rest.into_iter().cloned().collect();
+        let msgs: Vec<serde_json::Value> = rest.into_iter().map(claude_message).collect();
         let body = json!({
             "model": req.model,
             "system": system,
@@ -161,5 +162,104 @@ impl ClaudeAdapter {
             }
         }
         Ok(())
+    }
+}
+
+/// Translate one message into the Anthropic Messages shape. Plain text stays a
+/// string; multimodal messages become content blocks (text / image / document).
+fn claude_message(m: &ChatMessage) -> serde_json::Value {
+    match &m.content {
+        MessageContent::Text(s) => json!({ "role": m.role, "content": s }),
+        MessageContent::Parts(parts) => {
+            let mut blocks: Vec<serde_json::Value> = Vec::new();
+            for p in parts {
+                match p {
+                    ContentPart::Text { text } => {
+                        blocks.push(json!({ "type": "text", "text": text }));
+                    }
+                    ContentPart::ImageUrl { image_url } => {
+                        let (mime, data) = files::parse_data_uri(&image_url.url);
+                        if data.starts_with("http") && mime.is_empty() {
+                            blocks.push(json!({
+                                "type": "image",
+                                "source": { "type": "url", "url": image_url.url },
+                            }));
+                        } else {
+                            let media_type = if mime.is_empty() {
+                                "image/png".into()
+                            } else {
+                                mime
+                            };
+                            blocks.push(json!({
+                                "type": "image",
+                                "source": { "type": "base64", "media_type": media_type, "data": data },
+                            }));
+                        }
+                    }
+                    ContentPart::File { file } => {
+                        if files::is_pdf(file) {
+                            // Native PDF document block (Anthropic supports this directly).
+                            let (_, data) = files::parse_data_uri(&file.data);
+                            blocks.push(json!({
+                                "type": "document",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": "application/pdf",
+                                    "data": data,
+                                },
+                            }));
+                        } else {
+                            blocks.push(
+                                json!({ "type": "text", "text": files::as_prompt_block(file) }),
+                            );
+                        }
+                    }
+                }
+            }
+            json!({ "role": m.role, "content": blocks })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use p2ptokens_shared::types::{FileData, ImageUrl};
+
+    #[test]
+    fn image_becomes_base64_source_block() {
+        let m = ChatMessage {
+            role: "user".into(),
+            content: MessageContent::Parts(vec![ContentPart::ImageUrl {
+                image_url: ImageUrl {
+                    url: "data:image/jpeg;base64,QUJD".into(),
+                },
+            }]),
+        };
+        let v = claude_message(&m);
+        let block = &v["content"][0];
+        assert_eq!(block["type"], "image");
+        assert_eq!(block["source"]["type"], "base64");
+        assert_eq!(block["source"]["media_type"], "image/jpeg");
+        assert_eq!(block["source"]["data"], "QUJD");
+    }
+
+    #[test]
+    fn pdf_becomes_native_document_block() {
+        let m = ChatMessage {
+            role: "user".into(),
+            content: MessageContent::Parts(vec![ContentPart::File {
+                file: FileData {
+                    filename: "a.pdf".into(),
+                    mime: "application/pdf".into(),
+                    data: "data:application/pdf;base64,QUJD".into(),
+                },
+            }]),
+        };
+        let v = claude_message(&m);
+        let block = &v["content"][0];
+        assert_eq!(block["type"], "document");
+        assert_eq!(block["source"]["media_type"], "application/pdf");
+        assert_eq!(block["source"]["data"], "QUJD");
     }
 }

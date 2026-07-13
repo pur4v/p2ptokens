@@ -209,14 +209,145 @@ mod type_tests {
         e.served = 50;
         assert!((e.ratio() - 0.5).abs() < 1e-9);
     }
+
+    #[test]
+    fn plain_string_content_is_backward_compatible() {
+        // A legacy `"content":"hi"` message must still deserialize, and a plain
+        // text message must still serialize AS a string (byte-identical wire).
+        let m: ChatMessage = serde_json::from_str(r#"{"role":"user","content":"hi"}"#).unwrap();
+        assert_eq!(m.content, MessageContent::Text("hi".into()));
+        let out = serde_json::to_string(&m).unwrap();
+        assert_eq!(out, r#"{"role":"user","content":"hi"}"#);
+    }
+
+    #[test]
+    fn multimodal_parts_roundtrip() {
+        let json = r#"{"role":"user","content":[{"type":"text","text":"describe"},{"type":"image_url","image_url":{"url":"data:image/png;base64,AAA"}}]}"#;
+        let m: ChatMessage = serde_json::from_str(json).unwrap();
+        assert!(m.content.has_image());
+        assert_eq!(m.content.to_text(), "describe");
+        // roundtrips back to the same structured shape
+        let m2: ChatMessage = serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
+        assert_eq!(m, m2);
+    }
+
+    #[test]
+    fn file_part_parses_and_to_text_skips_binary() {
+        let json = r#"{"role":"user","content":[{"type":"text","text":"summarize"},{"type":"file","file":{"filename":"a.pdf","mime":"application/pdf","data":"data:application/pdf;base64,AAA"}}]}"#;
+        let m: ChatMessage = serde_json::from_str(json).unwrap();
+        // to_text keeps only text parts (the file is handled by the adapter)
+        assert_eq!(m.content.to_text(), "summarize");
+        assert!(!m.content.has_image());
+        assert_eq!(m.content.parts().len(), 2);
+    }
 }
 
 // ---- Chat completion surface (the subset we support) ----
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// One part of a multimodal message. Shaped to match the OpenAI chat content
+/// blocks so an OpenAI-compatible backend can consume `Parts` almost verbatim.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContentPart {
+    /// plain text segment
+    Text { text: String },
+    /// an image, carried inline as a `data:` URI (base64)
+    ImageUrl { image_url: ImageUrl },
+    /// a file (PDF / document / text) carried inline as base64
+    File { file: FileData },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImageUrl {
+    /// `data:<mime>;base64,<...>` (or a remote URL, passed through untouched)
+    pub url: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FileData {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub filename: String,
+    /// MIME type, e.g. `application/pdf` (best-effort; may be empty)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub mime: String,
+    /// `data:<mime>;base64,<...>` or a bare base64 payload
+    pub data: String,
+}
+
+/// Message content: either a plain string (the common case) or a list of
+/// multimodal parts. The `untagged` representation keeps full backward
+/// compatibility on the wire — `"content":"hi"` still (de)serializes as a
+/// string, so text-only traffic is byte-identical to before.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MessageContent {
+    Text(String),
+    Parts(Vec<ContentPart>),
+}
+
+impl Default for MessageContent {
+    fn default() -> Self {
+        MessageContent::Text(String::new())
+    }
+}
+
+impl From<String> for MessageContent {
+    fn from(s: String) -> Self {
+        MessageContent::Text(s)
+    }
+}
+impl From<&str> for MessageContent {
+    fn from(s: &str) -> Self {
+        MessageContent::Text(s.to_string())
+    }
+}
+
+impl MessageContent {
+    /// Flatten to plain text (concatenating text parts). Non-text parts are
+    /// dropped — used where only text matters (system prompts, titles, buffered
+    /// fallbacks). Use [`Self::parts`] when parts must be preserved.
+    pub fn to_text(&self) -> String {
+        match self {
+            MessageContent::Text(s) => s.clone(),
+            MessageContent::Parts(ps) => ps
+                .iter()
+                .filter_map(|p| match p {
+                    ContentPart::Text { text } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+        }
+    }
+    /// True if this content carries at least one image part.
+    pub fn has_image(&self) -> bool {
+        matches!(self, MessageContent::Parts(ps)
+            if ps.iter().any(|p| matches!(p, ContentPart::ImageUrl { .. })))
+    }
+    /// The parts view; a plain string is treated as a single text part.
+    pub fn parts(&self) -> Vec<ContentPart> {
+        match self {
+            MessageContent::Text(s) => vec![ContentPart::Text { text: s.clone() }],
+            MessageContent::Parts(ps) => ps.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
-    pub content: String,
+    #[serde(default)]
+    pub content: MessageContent,
+}
+
+impl ChatMessage {
+    /// Convenience constructor for a plain-text message.
+    pub fn text(role: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            role: role.into(),
+            content: MessageContent::Text(content.into()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

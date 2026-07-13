@@ -5,6 +5,7 @@
 
 mod claude;
 mod compat;
+pub mod files;
 mod ollama;
 
 pub use claude::ClaudeAdapter;
@@ -72,7 +73,7 @@ pub fn split_system(messages: &[ChatMessage]) -> (String, Vec<&ChatMessage>) {
             if !system.is_empty() {
                 system.push('\n');
             }
-            system.push_str(&m.content);
+            system.push_str(&m.content.to_text());
         } else {
             rest.push(m);
         }

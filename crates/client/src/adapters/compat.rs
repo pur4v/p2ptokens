@@ -10,8 +10,10 @@ use serde::Deserialize;
 use serde_json::json;
 use tokio::sync::mpsc;
 
+use super::files;
 use super::{estimate_tokens, AdapterRequest};
 use p2ptokens_shared::types::{CompletionDelta, ModelId};
+use p2ptokens_shared::types::{ContentPart, MessageContent};
 
 pub struct CompatAdapter {
     base_url: String,
@@ -71,9 +73,10 @@ impl CompatAdapter {
         req: AdapterRequest,
         tx: mpsc::Sender<CompletionDelta>,
     ) -> Result<()> {
+        let messages: Vec<serde_json::Value> = req.messages.iter().map(compat_message).collect();
         let body = json!({
             "model": req.model,
-            "messages": req.messages,
+            "messages": messages,
             "stream": true,
             "stream_options": { "include_usage": true },
             "temperature": req.params.temperature,
@@ -158,5 +161,65 @@ impl CompatAdapter {
             }
         }
         Ok(())
+    }
+}
+
+/// Translate one message into the OpenAI chat shape. Plain text stays a string;
+/// multimodal messages become a content array of `text` / `image_url` parts.
+/// Files have no portable OpenAI representation, so they are folded into text.
+fn compat_message(m: &p2ptokens_shared::types::ChatMessage) -> serde_json::Value {
+    match &m.content {
+        MessageContent::Text(s) => json!({ "role": m.role, "content": s }),
+        MessageContent::Parts(parts) => {
+            let blocks: Vec<serde_json::Value> = parts
+                .iter()
+                .map(|p| match p {
+                    ContentPart::Text { text } => json!({ "type": "text", "text": text }),
+                    ContentPart::ImageUrl { image_url } => {
+                        json!({ "type": "image_url", "image_url": { "url": image_url.url } })
+                    }
+                    ContentPart::File { file } => {
+                        json!({ "type": "text", "text": files::as_prompt_block(file) })
+                    }
+                })
+                .collect();
+            json!({ "role": m.role, "content": blocks })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use p2ptokens_shared::types::{ChatMessage, ImageUrl};
+
+    #[test]
+    fn image_serializes_as_openai_image_url() {
+        let m = ChatMessage {
+            role: "user".into(),
+            content: MessageContent::Parts(vec![
+                ContentPart::Text {
+                    text: "look".into(),
+                },
+                ContentPart::ImageUrl {
+                    image_url: ImageUrl {
+                        url: "data:image/png;base64,QUJD".into(),
+                    },
+                },
+            ]),
+        };
+        let v = compat_message(&m);
+        assert_eq!(v["content"][0]["type"], "text");
+        assert_eq!(v["content"][1]["type"], "image_url");
+        assert_eq!(
+            v["content"][1]["image_url"]["url"],
+            "data:image/png;base64,QUJD"
+        );
+    }
+
+    #[test]
+    fn plain_text_stays_a_string() {
+        let v = compat_message(&ChatMessage::text("user", "hello"));
+        assert_eq!(v["content"], "hello");
     }
 }

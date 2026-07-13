@@ -6,8 +6,10 @@ use serde::Deserialize;
 use serde_json::json;
 use tokio::sync::mpsc;
 
+use super::files;
 use super::{estimate_tokens, AdapterRequest};
-use p2ptokens_shared::types::{CompletionDelta, ModelId};
+use p2ptokens_shared::types::{CompletionDelta, MessageContent};
+use p2ptokens_shared::types::{ContentPart, ModelId};
 
 pub struct OllamaAdapter {
     base_url: String,
@@ -84,9 +86,10 @@ impl OllamaAdapter {
         req: AdapterRequest,
         tx: mpsc::Sender<CompletionDelta>,
     ) -> Result<()> {
+        let messages: Vec<serde_json::Value> = req.messages.iter().map(ollama_message).collect();
         let body = json!({
             "model": req.model,
-            "messages": req.messages,
+            "messages": messages,
             "stream": true,
             "options": {
                 "temperature": req.params.temperature,
@@ -153,5 +156,75 @@ impl OllamaAdapter {
             }
         }
         Ok(())
+    }
+}
+
+/// Translate one message into Ollama's `/api/chat` shape: text (plus any extracted
+/// file text) as `content`, and images as bare base64 in `images` (its vision API).
+fn ollama_message(m: &p2ptokens_shared::types::ChatMessage) -> serde_json::Value {
+    match &m.content {
+        MessageContent::Text(s) => json!({ "role": m.role, "content": s }),
+        MessageContent::Parts(parts) => {
+            let mut text = String::new();
+            let mut images: Vec<String> = Vec::new();
+            for p in parts {
+                match p {
+                    ContentPart::Text { text: t } => {
+                        if !text.is_empty() {
+                            text.push('\n');
+                        }
+                        text.push_str(t);
+                    }
+                    ContentPart::ImageUrl { image_url } => {
+                        // Ollama wants bare base64 (no data: prefix); pass remote URLs through.
+                        let (_, payload) = files::parse_data_uri(&image_url.url);
+                        images.push(payload);
+                    }
+                    ContentPart::File { file } => {
+                        if !text.is_empty() {
+                            text.push('\n');
+                        }
+                        text.push_str(&files::as_prompt_block(file));
+                    }
+                }
+            }
+            if images.is_empty() {
+                json!({ "role": m.role, "content": text })
+            } else {
+                json!({ "role": m.role, "content": text, "images": images })
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use p2ptokens_shared::types::{ChatMessage, ImageUrl};
+
+    #[test]
+    fn image_part_becomes_bare_base64_in_images() {
+        let m = ChatMessage {
+            role: "user".into(),
+            content: MessageContent::Parts(vec![
+                ContentPart::Text { text: "hi".into() },
+                ContentPart::ImageUrl {
+                    image_url: ImageUrl {
+                        url: "data:image/png;base64,QUJD".into(),
+                    },
+                },
+            ]),
+        };
+        let v = ollama_message(&m);
+        assert_eq!(v["content"], "hi");
+        assert_eq!(v["images"][0], "QUJD"); // data: prefix stripped
+    }
+
+    #[test]
+    fn plain_text_has_no_images_field() {
+        let m = ChatMessage::text("user", "hello");
+        let v = ollama_message(&m);
+        assert_eq!(v["content"], "hello");
+        assert!(v.get("images").is_none());
     }
 }
