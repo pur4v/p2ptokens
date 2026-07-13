@@ -37,6 +37,9 @@ pub struct MatchManyRequest {
     /// how many distinct providers to return (coordinator clamps to a max).
     #[serde(default)]
     pub count: u32,
+    /// capabilities the consumer requires (empty = none). See `MatchRequest`.
+    #[serde(default, skip_serializing_if = "crate::types::ModelCaps::is_empty")]
+    pub require: crate::types::ModelCaps,
 }
 
 /// Response to `POST /match_many`. `Matched.matches` may be shorter than the

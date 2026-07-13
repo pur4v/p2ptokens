@@ -110,6 +110,7 @@ async fn run_job(
     params: p2ptokens_shared::types::ChatCompletionParams,
     consumer_pubkey: String,
 ) -> Result<()> {
+    let started = std::time::Instant::now();
     // Drive the adapter in a background task, streaming deltas over a channel.
     let (tx, mut rx) = mpsc::channel(64);
     let ctx2 = ctx.clone();
@@ -175,6 +176,20 @@ async fn run_job(
     }
 
     let _ = producer.await;
+
+    // Update the serving-throughput EMA (tokens/sec) the heartbeat reports, so the
+    // coordinator can prefer faster peers. Ignore tiny/degenerate samples.
+    let secs = started.elapsed().as_secs_f64();
+    if secs >= 0.5 && cumulative > 0 {
+        let sample = cumulative as f64 / secs;
+        let prev = f64::from_bits(ctx.tps_ema.load(Ordering::Relaxed));
+        let ema = if prev <= 0.0 {
+            sample
+        } else {
+            0.7 * prev + 0.3 * sample
+        };
+        ctx.tps_ema.store(ema.to_bits(), Ordering::Relaxed);
+    }
 
     // Settle the highest-seq consumer-signed receipt with the coordinator.
     if let Some(receipt) = latest {

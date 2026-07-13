@@ -12,8 +12,39 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
+/// serde predicate: omit a zero float on the wire.
+fn is_zero(v: &f64) -> bool {
+    *v == 0.0
+}
+
+/// Coarse model capabilities — advertised by a seeder and optionally required by
+/// a consumer for capability-aware matching. All false by default (= unknown), so
+/// they cost nothing on the wire and stay backward-compatible.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelCaps {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub tools: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub vision: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub reasoning: bool,
+}
+
+impl ModelCaps {
+    /// True if this offer satisfies every capability the request requires.
+    pub fn satisfies(&self, req: &ModelCaps) -> bool {
+        (!req.tools || self.tools)
+            && (!req.vision || self.vision)
+            && (!req.reasoning || self.reasoning)
+    }
+    /// No capability set/required.
+    pub fn is_empty(&self) -> bool {
+        !self.tools && !self.vision && !self.reasoning
+    }
+}
+
 /// A model identity as advertised and matched on. Backend-agnostic (Q5/Q13).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModelId {
     /// e.g. "llama3.1:8b", "gpt-4o", "claude-3-5-sonnet-latest"
     pub name: String,
@@ -34,11 +65,18 @@ impl ModelId {
 
 /// What a seeder can serve. The backend kind is provider-internal and never
 /// exposed to consumers — matching is purely by model name.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ModelOffer {
     pub model: ModelId,
     /// "ollama" | "endpoint" | "claude"
     pub backend: String,
+    /// coarse capabilities of this model (tools/vision/reasoning). Empty = unknown.
+    #[serde(default, skip_serializing_if = "ModelCaps::is_empty")]
+    pub caps: ModelCaps,
+    /// serving throughput estimate (tokens/sec, EMA) the seeder reports so the
+    /// coordinator can prefer faster peers. 0 = unknown (neutral).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub tokens_per_sec: f64,
 }
 
 /// Heartbeat a seeder sends to the coordinator to stay in the live directory.
@@ -63,10 +101,14 @@ pub struct Heartbeat {
 }
 
 /// A consumer's request to the coordinator to be matched with a seeder.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MatchRequest {
     pub consumer: String,
     pub model: ModelId,
+    /// capabilities the consumer requires (e.g. `tools`). Empty = no requirement;
+    /// if no capable provider exists the coordinator falls back to any provider.
+    #[serde(default, skip_serializing_if = "ModelCaps::is_empty")]
+    pub require: ModelCaps,
 }
 
 /// The coordinator's answer: a seeder to dial, plus a signed job grant.

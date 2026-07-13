@@ -1,7 +1,7 @@
 //! Shared runtime context for the unified client (seeder + leecher).
 
 use std::collections::HashMap;
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicU32, AtomicU64};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -34,6 +34,9 @@ pub struct Ctx {
     pub offers: Vec<ModelOffer>,
     pub capacity: u32,
     pub in_flight: Arc<AtomicU32>,
+    /// serving throughput EMA (tokens/sec) as `f64::to_bits`, updated by the
+    /// seeder and reported in heartbeats so the coordinator can prefer fast peers.
+    pub tps_ema: Arc<AtomicU64>,
     /// network namespace (scopes the libp2p protocol → swarm isolation)
     pub network_id: String,
     /// white-label branding served to the dashboard via `/api/config`

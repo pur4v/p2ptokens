@@ -15,7 +15,7 @@ mod seeder;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,7 +23,7 @@ use anyhow::Result;
 
 use p2ptokens_shared::config::{BrandConfig, PlatformConfig};
 use p2ptokens_shared::crypto;
-use p2ptokens_shared::types::{Heartbeat, ModelOffer};
+use p2ptokens_shared::types::{Heartbeat, ModelCaps, ModelOffer};
 
 use adapters::{Adapter, ClaudeAdapter, CompatAdapter, OllamaAdapter};
 use config::{load_or_create_identity, BackendConfig};
@@ -94,6 +94,25 @@ pub fn resolve_data_dir(data_dir: &Option<String>) -> PathBuf {
     })
 }
 
+/// Coarse capability heuristic by backend (until per-model probing exists):
+/// Claude is fully capable; a generic OpenAI-compatible endpoint usually supports
+/// tools; Ollama/unknown are left unspecified so capability matching falls back to
+/// any peer serving the model.
+fn caps_for_backend(backend: &str) -> ModelCaps {
+    match backend {
+        "claude" => ModelCaps {
+            tools: true,
+            vision: true,
+            reasoning: true,
+        },
+        "endpoint" => ModelCaps {
+            tools: true,
+            ..Default::default()
+        },
+        _ => ModelCaps::default(),
+    }
+}
+
 /// Start the unified client and serve until the process exits.
 pub async fn run(cfg: RunConfig) -> Result<()> {
     let data_dir = resolve_data_dir(&cfg.data_dir);
@@ -153,6 +172,8 @@ pub async fn run(cfg: RunConfig) -> Result<()> {
                     offers.push(ModelOffer {
                         model: m.clone(),
                         backend: a.backend().to_string(),
+                        caps: caps_for_backend(a.backend()),
+                        tokens_per_sec: 0.0, // filled from the live EMA at heartbeat time
                     });
                     model_index.entry(key).or_insert(ModelServe {
                         adapter: i,
@@ -180,6 +201,7 @@ pub async fn run(cfg: RunConfig) -> Result<()> {
         offers,
         capacity: cfg.capacity,
         in_flight: Arc::new(AtomicU32::new(0)),
+        tps_ema: Arc::new(AtomicU64::new(0)),
         network_id: cfg.network_id.clone(),
         brand: cfg.brand.clone(),
     });
@@ -205,10 +227,22 @@ pub async fn run(cfg: RunConfig) -> Result<()> {
                     .iter()
                     .map(|a| a.to_string())
                     .collect();
+                // Report the live serving-throughput EMA on every offer so the
+                // coordinator can prefer faster peers.
+                let tps = f64::from_bits(ctx.tps_ema.load(Ordering::Relaxed));
+                let offers: Vec<ModelOffer> = ctx
+                    .offers
+                    .iter()
+                    .map(|o| {
+                        let mut o = o.clone();
+                        o.tokens_per_sec = tps;
+                        o
+                    })
+                    .collect();
                 let mut hb = Heartbeat {
                     peer_id: ctx.local_peer.to_string(),
                     multiaddrs,
-                    offers: ctx.offers.clone(),
+                    offers,
                     capacity: ctx.capacity,
                     in_flight: ctx.in_flight.load(Ordering::SeqCst),
                     pubkey: String::new(),

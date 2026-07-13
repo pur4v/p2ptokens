@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use dashmap::{DashMap, DashSet};
 
-use p2ptokens_shared::types::{Heartbeat, LedgerEntry, ModelId};
+use p2ptokens_shared::types::{Heartbeat, LedgerEntry, ModelCaps, ModelId};
 
 /// Max live candidates gathered per match, and max index entries scanned to find
 /// them. Both bound the per-match work to O(1) regardless of total swarm size.
@@ -31,6 +31,8 @@ pub const NEWCOMER_AUDIT_THRESHOLD: u32 = 3;
 pub const MAX_FANOUT: usize = 5;
 /// A job unsettled for longer than this is swept (abandoned race losers / crashes).
 pub const JOB_TTL_MS: u64 = 5 * 60 * 1000;
+/// Throughput (tok/s) at/above which a provider earns the full speed bonus.
+const TPS_CAP: f64 = 100.0;
 
 // --- Input bounds (heartbeats are unauthenticated, so cap everything an
 // attacker could inflate to bloat memory or poison the per-model index). ---
@@ -113,6 +115,16 @@ pub struct Job {
     pub created: u64,
 }
 
+/// A live candidate provider gathered during matchmaking.
+struct Cand {
+    peer: String,
+    addrs: Vec<String>,
+    model: ModelId,
+    newcomer: bool,
+    tps: f64,
+    caps_ok: bool,
+}
+
 #[derive(Default)]
 pub struct State {
     pub providers: DashMap<String, Provider>,
@@ -191,16 +203,12 @@ impl State {
     }
 
     /// O(1) sampling core: open the model's index page, take a bounded number of
-    /// LIVE, non-full candidate providers (never the consumer itself), and lazily
-    /// prune peers that have vanished. Shared by single- and multi-select.
-    /// Returns (peer, addrs, concrete_model, is_newcomer) tuples.
-    fn sample_candidates(
-        &self,
-        req: &ModelId,
-        consumer: &str,
-    ) -> Vec<(String, Vec<String>, ModelId, bool)> {
+    /// LIVE, non-full candidates (never the consumer itself), lazily prune peers
+    /// that vanished, then apply the capability filter with graceful fallback (if
+    /// any candidate satisfies the required caps, keep only those; else keep all).
+    fn sample_candidates(&self, req: &ModelId, consumer: &str, require: &ModelCaps) -> Vec<Cand> {
         let now = now_ms();
-        let mut candidates: Vec<(String, Vec<String>, ModelId, bool)> = Vec::new();
+        let mut candidates: Vec<Cand> = Vec::new();
         let mut stale: Vec<String> = Vec::new();
 
         {
@@ -224,12 +232,14 @@ impl State {
                     {
                         if let Some(off) = p.hb.offers.iter().find(|o| offer_matches(req, &o.model))
                         {
-                            candidates.push((
-                                pid.clone(),
-                                p.hb.multiaddrs.clone(),
-                                off.model.clone(),
-                                self.is_newcomer(&pid),
-                            ));
+                            candidates.push(Cand {
+                                caps_ok: off.caps.satisfies(require),
+                                tps: off.tokens_per_sec,
+                                newcomer: self.is_newcomer(&pid),
+                                model: off.model.clone(),
+                                addrs: p.hb.multiaddrs.clone(),
+                                peer: pid.clone(),
+                            });
                         }
                     }
                     None => stale.push(pid), // peer gone → prune from index lazily
@@ -245,18 +255,49 @@ impl State {
                 }
             }
         }
+
+        // Capability filter with fallback: prefer providers that meet the required
+        // caps, but if none do, fall back to any provider serving the model.
+        if candidates.iter().any(|c| c.caps_ok) {
+            candidates.retain(|c| c.caps_ok);
+        }
         candidates
     }
 
-    /// Choose a provider for a model. Reputation-weighted, with roughly every
-    /// AUDIT_EVERY-th match reserved for a newcomer (optimistic unchoke). Returns
-    /// the provider plus the concrete model it will serve (with quant).
+    /// Selection weight: reputation scaled by a throughput factor (1×–2×). Unknown
+    /// throughput (0) is neutral so cold providers still get picked and accumulate
+    /// samples.
+    fn cand_weight(&self, c: &Cand) -> f64 {
+        let rep = self.reputation_of(&c.peer).clamp(0.05, 1.0);
+        let tps_factor = if c.tps <= 0.0 {
+            1.0
+        } else {
+            1.0 + (c.tps.min(TPS_CAP) / TPS_CAP)
+        };
+        rep * tps_factor
+    }
+
+    /// Choose a provider for a model (no capability requirement). Convenience over
+    /// [`Self::select_provider_req`].
     pub fn select_provider(
         &self,
         req: &ModelId,
         consumer: &str,
     ) -> Option<(String, Vec<String>, bool, ModelId)> {
-        let mut candidates = self.sample_candidates(req, consumer);
+        self.select_provider_req(req, consumer, &ModelCaps::default())
+    }
+
+    /// Choose a provider satisfying `require`. Roughly every AUDIT_EVERY-th match
+    /// is reserved for a newcomer (optimistic unchoke); otherwise a
+    /// throughput+reputation **weighted** pick spreads load across good, fast peers
+    /// instead of funnelling everything onto the single top-ranked one.
+    pub fn select_provider_req(
+        &self,
+        req: &ModelId,
+        consumer: &str,
+        require: &ModelCaps,
+    ) -> Option<(String, Vec<String>, bool, ModelId)> {
+        let mut candidates = self.sample_candidates(req, consumer, require);
         if candidates.is_empty() {
             return None;
         }
@@ -264,45 +305,51 @@ impl State {
         let counter = self.match_counter.fetch_add(1, Ordering::Relaxed) + 1;
 
         if counter % AUDIT_EVERY == 0 {
-            let newcomers: Vec<usize> =
-                (0..candidates.len()).filter(|&i| candidates[i].3).collect();
+            let newcomers: Vec<usize> = (0..candidates.len())
+                .filter(|&i| candidates[i].newcomer)
+                .collect();
             if !newcomers.is_empty() {
                 let pick = newcomers[(counter as usize) % newcomers.len()];
                 let c = candidates.swap_remove(pick);
-                return Some((c.0, c.1, true, c.2));
+                return Some((c.peer, c.addrs, true, c.model));
             }
         }
 
-        candidates.sort_by(|a, b| {
-            self.reputation_of(&b.0)
-                .partial_cmp(&self.reputation_of(&a.0))
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        let c = candidates.swap_remove(0);
-        Some((c.0, c.1, false, c.2))
+        let weights: Vec<f64> = candidates.iter().map(|c| self.cand_weight(c)).collect();
+        let idx = weighted_index(&weights, counter);
+        let c = candidates.swap_remove(idx);
+        Some((c.peer, c.addrs, false, c.model))
     }
 
-    /// Choose up to `k` DISTINCT providers for a model (client-side fan-out:
-    /// racing / quorum / ensemble). Returns the top-k of the sample by
-    /// reputation. Fewer than `k` (or empty) if the swarm can't supply that many.
+    /// Fan-out: up to `k` DISTINCT providers (no capability requirement).
     pub fn select_providers(
         &self,
         req: &ModelId,
         consumer: &str,
         k: usize,
     ) -> Vec<(String, Vec<String>, bool, ModelId)> {
-        let mut candidates = self.sample_candidates(req, consumer);
+        self.select_providers_req(req, consumer, k, &ModelCaps::default())
+    }
+
+    /// Fan-out: up to `k` DISTINCT providers satisfying `require`, best-first by
+    /// throughput+reputation weight (racing/quorum/ensemble want the strongest K).
+    pub fn select_providers_req(
+        &self,
+        req: &ModelId,
+        consumer: &str,
+        k: usize,
+        require: &ModelCaps,
+    ) -> Vec<(String, Vec<String>, bool, ModelId)> {
+        let mut candidates = self.sample_candidates(req, consumer, require);
         candidates.sort_by(|a, b| {
-            self.reputation_of(&b.0)
-                .partial_cmp(&self.reputation_of(&a.0))
+            self.cand_weight(b)
+                .partial_cmp(&self.cand_weight(a))
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         candidates.truncate(k);
-        // reorder each tuple to (peer, addrs, is_newcomer, model) to match the
-        // shape callers use (same as select_provider's return).
         candidates
             .into_iter()
-            .map(|(peer, addrs, model, newcomer)| (peer, addrs, newcomer, model))
+            .map(|c| (c.peer, c.addrs, c.newcomer, c.model))
             .collect()
     }
 
@@ -337,10 +384,37 @@ fn offer_matches(req: &ModelId, offer: &ModelId) -> bool {
     }
 }
 
+/// Deterministic PRNG (SplitMix64) — no external `rand` dependency.
+fn splitmix64(seed: u64) -> u64 {
+    let mut x = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    x ^ (x >> 31)
+}
+
+/// Pick an index with probability proportional to `weights`, seeded by `seed`
+/// (deterministic for a given seed → reproducible in tests; varies across matches
+/// → spreads load).
+fn weighted_index(weights: &[f64], seed: u64) -> usize {
+    let total: f64 = weights.iter().sum();
+    if total <= 0.0 {
+        return 0;
+    }
+    let r = (splitmix64(seed) as f64 / u64::MAX as f64) * total;
+    let mut acc = 0.0;
+    for (i, w) in weights.iter().enumerate() {
+        acc += w;
+        if r < acc {
+            return i;
+        }
+    }
+    weights.len() - 1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use p2ptokens_shared::types::ModelOffer;
+    use p2ptokens_shared::types::{ModelCaps, ModelOffer};
 
     fn model(name: &str) -> ModelId {
         ModelId {
@@ -361,11 +435,24 @@ mod tests {
             offers: vec![ModelOffer {
                 model: m.clone(),
                 backend: "ollama".into(),
+                ..Default::default()
             }],
             capacity: cap,
             in_flight: inflight,
             pubkey: String::new(),
             sig: String::new(),
+        }
+    }
+    /// A heartbeat whose single offer advertises a serving throughput (tokens/sec).
+    fn hb_tps(peer: &str, m: &ModelId, tps: f64) -> Heartbeat {
+        let mut h = hb(peer, m, 4, 0);
+        h.offers[0].tokens_per_sec = tps;
+        h
+    }
+    fn caps(tools: bool) -> ModelCaps {
+        ModelCaps {
+            tools,
+            ..Default::default()
         }
     }
     /// Insert a NON-newcomer ledger row with a fixed reputation (audits_total high).
@@ -444,15 +531,86 @@ mod tests {
     }
 
     #[test]
-    fn picks_highest_reputation() {
+    fn weighted_selection_favors_reputation_but_spreads() {
         let st = State::default();
         st.register(hb("low", &model("llama"), 4, 0));
         st.register(hb("high", &model("llama"), 4, 0));
         set_rep(&st, "low", 0.30);
         set_rep(&st, "high", 0.95); // both non-newcomers → no audit slot interference
-        let m = st.select_provider(&model("llama"), "c").unwrap();
-        assert_eq!(m.0, "high");
-        assert!(!m.2); // not an audit route
+        let (mut hi, mut lo) = (0, 0);
+        for _ in 0..300 {
+            match st.select_provider(&model("llama"), "c").unwrap().0.as_str() {
+                "high" => hi += 1,
+                "low" => lo += 1,
+                other => panic!("unexpected provider {other}"),
+            }
+        }
+        // Reputation biases the draw toward the better peer …
+        assert!(hi > lo, "higher reputation wins more often ({hi} vs {lo})");
+        // … but weighting spreads load — the weaker peer is not starved.
+        assert!(lo > 0, "lower reputation is not starved ({lo})");
+    }
+
+    #[test]
+    fn weighted_selection_favors_faster_throughput() {
+        let st = State::default();
+        st.register(hb_tps("fast", &model("llama"), 100.0));
+        st.register(hb_tps("slow", &model("llama"), 1.0));
+        // Equal reputation → throughput is the only differentiator.
+        set_rep(&st, "fast", 0.9);
+        set_rep(&st, "slow", 0.9);
+        let (mut f, mut s) = (0, 0);
+        for _ in 0..300 {
+            match st.select_provider(&model("llama"), "c").unwrap().0.as_str() {
+                "fast" => f += 1,
+                "slow" => s += 1,
+                other => panic!("unexpected provider {other}"),
+            }
+        }
+        assert!(f > s, "faster peer wins more often ({f} vs {s})");
+        assert!(s > 0, "slow peer is not starved ({s})");
+    }
+
+    #[test]
+    fn capability_filter_prefers_capable_then_falls_back() {
+        // A tools-capable peer alongside a plain one; a tools request must route to
+        // the capable peer every time.
+        let st = State::default();
+        let mut cap = hb("capable", &model("llama"), 4, 0);
+        cap.offers[0].caps = caps(true);
+        st.register(cap);
+        st.register(hb("plain", &model("llama"), 4, 0));
+        set_rep(&st, "capable", 0.5); // lower rep, but it's the only capable one
+        set_rep(&st, "plain", 0.99);
+        let require = caps(true);
+        for _ in 0..30 {
+            let m = st
+                .select_provider_req(&model("llama"), "c", &require)
+                .unwrap();
+            assert_eq!(m.0, "capable", "tools request must hit the capable peer");
+        }
+
+        // When NO provider is capable, fall back to serving the model anyway rather
+        // than returning nothing.
+        let st2 = State::default();
+        st2.register(hb("plain", &model("llama"), 4, 0));
+        assert!(
+            st2.select_provider_req(&model("llama"), "c", &require)
+                .is_some(),
+            "capability filter must fall back when nobody is capable"
+        );
+    }
+
+    #[test]
+    fn weighted_index_bounds_and_skew() {
+        assert_eq!(weighted_index(&[], 1), 0, "empty → 0");
+        assert_eq!(weighted_index(&[0.0, 0.0], 1), 0, "all-zero weights → 0");
+        assert_eq!(weighted_index(&[1.0], 7), 0, "single element → 0");
+        // Heavily skewed weights: index 1 should win the vast majority of seeds.
+        let ones = (0..200u64)
+            .filter(|&seed| weighted_index(&[0.01, 100.0], seed) == 1)
+            .count();
+        assert!(ones > 180, "dominant weight wins most draws ({ones}/200)");
     }
 
     #[test]
@@ -536,6 +694,7 @@ mod tests {
             .map(|i| ModelOffer {
                 model: model(&format!("m{i}")),
                 backend: "ollama".into(),
+                ..Default::default()
             })
             .collect();
         assert!(validate_heartbeat(&good).is_err()); // too many offers

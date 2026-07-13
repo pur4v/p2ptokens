@@ -76,6 +76,7 @@ mod tests {
                     quant: None,
                 },
                 backend: "ollama".into(),
+                ..Default::default()
             }],
             capacity: 4,
             in_flight: 0,

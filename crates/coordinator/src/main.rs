@@ -171,7 +171,7 @@ async fn do_match(
         return Json(MatchResponse::RatioExceeded);
     }
 
-    match st.select_provider(&req.model, &req.consumer) {
+    match st.select_provider_req(&req.model, &req.consumer, &req.require) {
         None => Json(MatchResponse::NoProvider),
         Some((provider, multiaddrs, audit, concrete)) => {
             let job_id = uuid::Uuid::new_v4().to_string();
@@ -210,7 +210,7 @@ async fn do_match_many(
     // Clamp the fan-out width so one request can't create an unbounded number of
     // jobs / dial an unbounded number of peers.
     let k = (req.count.max(1) as usize).min(state::MAX_FANOUT);
-    let picked = st.select_providers(&req.model, &req.consumer, k);
+    let picked = st.select_providers_req(&req.model, &req.consumer, k, &req.require);
 
     let matches = picked
         .into_iter()

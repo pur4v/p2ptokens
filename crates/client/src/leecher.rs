@@ -84,6 +84,7 @@ async fn run<F: FnMut(&str)>(
         .request_match(&MatchRequest {
             consumer: ctx.local_peer.to_string(),
             model,
+            ..Default::default()
         })
         .await?;
 
@@ -281,6 +282,7 @@ pub async fn fan_out(
             consumer: ctx.local_peer.to_string(),
             model,
             count,
+            require: Default::default(),
         })
         .await?;
     if matches.is_empty() {
