@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" role="img" aria-label="p2ptokens architecture">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <marker id="ag" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto-start-reverse"><path d="M0,0 L8,3 L0,6 Z" fill="#33ff88"/></marker>
+    <marker id="aa" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#ffb000"/></marker>
+  </defs>
+
+  <rect width="1000" height="700" fill="#0b0f0b"/>
+  <text x="34" y="48" fill="#33ff88" font-size="30" font-weight="700" filter="url(#glow)">p2ptokens</text>
+  <text x="215" y="48" fill="#4f7a63" font-size="15">// distributed · peer-to-peer · decentralized LLM inference</text>
+
+  <!-- COORDINATOR -->
+  <g>
+    <rect x="360" y="86" width="280" height="120" rx="10" fill="#0e140e" stroke="#ffb000" stroke-width="2"/>
+    <text x="500" y="112" text-anchor="middle" fill="#ffb000" font-size="16" font-weight="700">COORDINATOR</text>
+    <text x="500" y="131" text-anchor="middle" fill="#4f7a63" font-size="12">content-blind tracker</text>
+    <line x1="376" y1="142" x2="624" y2="142" stroke="#1f5a3a"/>
+    <text x="500" y="161" text-anchor="middle" fill="#9fe6bd" font-size="12.5">registry · O(1) matchmaker</text>
+    <text x="500" y="180" text-anchor="middle" fill="#9fe6bd" font-size="12.5">barter ratio ledger · settlement</text>
+    <text x="500" y="197" text-anchor="middle" fill="#4f7a63" font-size="11">signed heartbeats · never sees prompts</text>
+  </g>
+
+  <!-- RELAY -->
+  <g>
+    <rect x="742" y="96" width="230" height="90" rx="10" fill="#0e140e" stroke="#1f5a3a" stroke-width="2"/>
+    <text x="857" y="122" text-anchor="middle" fill="#33ff88" font-size="15" font-weight="700">RELAY</text>
+    <text x="857" y="143" text-anchor="middle" fill="#9fe6bd" font-size="11.5">NAT traversal · circuit-relay</text>
+    <text x="857" y="160" text-anchor="middle" fill="#9fe6bd" font-size="11.5">AutoNAT · UPnP · DCUtR</text>
+    <text x="857" y="177" text-anchor="middle" fill="#4f7a63" font-size="10.5">hole-punch to a direct link</text>
+  </g>
+
+  <!-- CONTROL PLANE (amber dashed) coordinator <-> peers -->
+  <g stroke="#ffb000" stroke-width="1.8" stroke-dasharray="6 5" fill="none" opacity="0.85">
+    <path d="M175 440 C 260 300, 340 240, 400 206" marker-end="url(#aa)"/>
+    <path d="M520 466 C 512 380, 506 300, 500 208" marker-end="url(#aa)"/>
+    <path d="M825 360 C 720 300, 640 250, 600 206" marker-end="url(#aa)"/>
+  </g>
+  <text x="300" y="270" fill="#ffb000" font-size="11" transform="rotate(-32 300 270)">match</text>
+  <text x="530" y="338" fill="#ffb000" font-size="11">heartbeat</text>
+  <text x="672" y="262" fill="#ffb000" font-size="11" transform="rotate(30 672 262)">settle</text>
+  <!-- (control-plane explanation lives in the legend, top-left) -->
+
+  <!-- SWARM: seeder peers -->
+  <!-- seeder A (with backends) -->
+  <g>
+    <rect x="742" y="352" width="238" height="150" rx="10" fill="#0e140e" stroke="#1f5a3a" stroke-width="2"/>
+    <circle cx="766" cy="378" r="7" fill="#33ff88" filter="url(#glow)"/>
+    <text x="784" y="383" fill="#33ff88" font-size="14" font-weight="700">peer · seeder</text>
+    <text x="762" y="410" fill="#4f7a63" font-size="11">local backends:</text>
+    <rect x="762" y="420" width="196" height="24" rx="5" fill="#061006" stroke="#1f5a3a"/>
+    <text x="770" y="437" fill="#9fe6bd" font-size="12">Ollama · endpoint · Claude</text>
+    <text x="762" y="466" fill="#4f7a63" font-size="11">serves /v1 completions</text>
+    <text x="762" y="486" fill="#4f7a63" font-size="11">ed25519 id = PeerId = signer</text>
+  </g>
+  <!-- seeder B -->
+  <g>
+    <rect x="430" y="470" width="190" height="96" rx="10" fill="#0e140e" stroke="#1f5a3a" stroke-width="2"/>
+    <circle cx="454" cy="496" r="7" fill="#33ff88" filter="url(#glow)"/>
+    <text x="472" y="501" fill="#33ff88" font-size="14" font-weight="700">peer · seeder</text>
+    <text x="450" y="528" fill="#9fe6bd" font-size="11.5">local model</text>
+    <text x="450" y="547" fill="#4f7a63" font-size="11">capacity · reputation</text>
+  </g>
+  <!-- seeder C -->
+  <g>
+    <rect x="648" y="556" width="176" height="92" rx="10" fill="#0e140e" stroke="#1f5a3a" stroke-width="2"/>
+    <circle cx="672" cy="582" r="7" fill="#33ff88" filter="url(#glow)"/>
+    <text x="690" y="587" fill="#33ff88" font-size="14" font-weight="700">peer · seeder</text>
+    <text x="668" y="614" fill="#9fe6bd" font-size="11.5">local model</text>
+    <text x="668" y="633" fill="#4f7a63" font-size="11">newcomer slot</text>
+  </g>
+
+  <!-- CONSUMER (you / leecher) -->
+  <g>
+    <rect x="34" y="430" width="282" height="176" rx="10" fill="#0e140e" stroke="#33ff88" stroke-width="2"/>
+    <circle cx="58" cy="458" r="7" fill="#ffb000" filter="url(#glow)"/>
+    <text x="76" y="463" fill="#33ff88" font-size="15" font-weight="700">you · leecher</text>
+    <rect x="52" y="478" width="246" height="26" rx="5" fill="#061006" stroke="#1f5a3a"/>
+    <text x="60" y="496" fill="#9fe6bd" font-size="12.5">/v1/chat/completions  (OpenAI-compat)</text>
+    <text x="52" y="528" fill="#4f7a63" font-size="11.5">fan-out to K peers:</text>
+    <text x="52" y="548" fill="#33ff88" font-size="12">racing · quorum · ensemble</text>
+    <text x="52" y="574" fill="#4f7a63" font-size="11">co-signs a receipt per chunk</text>
+    <text x="52" y="592" fill="#4f7a63" font-size="11">upload/download ratio gates access</text>
+  </g>
+
+  <!-- DATA PLANE (green solid): P2P streams, consumer -> seeders (fan-out) + swarm mesh -->
+  <g stroke="#33ff88" stroke-width="2.4" fill="none" filter="url(#glow)">
+    <path d="M316 496 C 480 470, 640 440, 742 418" marker-start="url(#ag)" marker-end="url(#ag)"/>
+    <path d="M316 520 C 380 530, 410 522, 430 518" marker-start="url(#ag)" marker-end="url(#ag)"/>
+    <path d="M316 560 C 470 620, 580 610, 648 600" marker-start="url(#ag)" marker-end="url(#ag)"/>
+  </g>
+  <!-- swarm interconnections (thin) -->
+  <g stroke="#1c7a44" stroke-width="1.6" fill="none" opacity="0.8">
+    <path d="M620 512 C 690 520, 720 470, 742 452"/>
+    <path d="M620 540 L 648 585"/>
+  </g>
+  <!-- data-plane explanation is in the legend (top-left); the green arrows are the P2P streams -->
+  <text x="326" y="452" fill="#4f7a63" font-size="11">libp2p stream ⇄</text>
+
+  <!-- CAPTION -->
+  <rect x="34" y="642" width="946" height="34" rx="8" fill="#0e140e" stroke="#1f5a3a"/>
+  <text x="500" y="664" text-anchor="middle" fill="#9fe6bd" font-size="13">▸ the coordinator brokers matches &amp; moves the ratio — <tspan fill="#ffb000" font-weight="700">inference bytes never touch it</tspan>; they flow directly peer-to-peer</text>
+
+  <!-- LEGEND (top-left, clear space) -->
+  <g font-size="11">
+    <rect x="34" y="86" width="300" height="62" rx="8" fill="#0e140e" stroke="#1f5a3a"/>
+    <line x1="48" y1="110" x2="82" y2="110" stroke="#33ff88" stroke-width="2.6" filter="url(#glow)"/>
+    <text x="92" y="114" fill="#9fe6bd">P2P data · libp2p (tokens+receipts)</text>
+    <line x1="48" y1="133" x2="82" y2="133" stroke="#ffb000" stroke-width="1.8" stroke-dasharray="6 5"/>
+    <text x="92" y="137" fill="#9fe6bd">control — HTTP metadata only</text>
+  </g>
+</svg>

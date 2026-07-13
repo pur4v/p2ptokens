@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>p2ptokens docs // distributed peer-to-peer LLM inference</title>
+<meta name="description" content="Documentation for p2ptokens — a distributed, peer-to-peer, decentralized network for LLM inference. Quickstart, install, configuration, self-hosting your own private network, the /v1 API, the barter economy, architecture, and FAQ.">
+<meta name="keywords" content="p2ptokens docs, distributed LLM inference, peer-to-peer, decentralized AI, self-hosted OpenAI-compatible API, BitTorrent protocol, Ollama, libp2p, run your own LLM mesh">
+<style>
+  :root{--bg:#0b0f0b;--panel:#0e140e;--green:#33ff88;--green-dim:#2ecc71;--green-faint:#1c7a44;--amber:#ffb000;--red:#ff4d4d;--fg:#9fe6bd;--muted:#4f7a63;--border:#1f5a3a;}
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:14px;line-height:1.55;}
+  a{color:var(--amber);text-decoration:none;} a:hover{color:var(--green);}
+  .layout{display:grid;grid-template-columns:230px 1fr;max-width:1100px;margin:0 auto;gap:0;}
+  @media(max-width:820px){.layout{grid-template-columns:1fr;}}
+  /* sidebar */
+  aside{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;border-right:1px solid var(--border);padding:18px 14px;background:var(--panel);}
+  @media(max-width:820px){aside{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);}}
+  .brand{color:var(--green);font-weight:700;font-size:16px;letter-spacing:1px;text-shadow:0 0 6px rgba(51,255,136,.35);}
+  .brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:.5px;font-weight:400;margin-top:2px;}
+  nav{margin-top:16px;}
+  nav a{display:block;color:var(--fg);padding:5px 8px;border-left:2px solid transparent;font-size:13px;}
+  nav a:hover{color:var(--green);border-left-color:var(--green-faint);background:#0a130a;}
+  nav .grp{color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:1px;margin:14px 0 4px 8px;}
+  main{padding:26px 30px 80px;min-width:0;}
+  h1{color:var(--green);font-size:26px;text-shadow:0 0 8px rgba(51,255,136,.3);margin:0 0 6px;}
+  h2{color:var(--green);font-size:19px;border-bottom:1px solid var(--border);padding:24px 0 6px;margin:28px 0 10px;letter-spacing:.5px;}
+  h3{color:var(--amber);font-size:15px;margin:18px 0 6px;}
+  p,li{color:var(--fg);}
+  code{background:#061006;border:1px solid var(--border);padding:1px 5px;border-radius:3px;color:var(--green);font-size:12.5px;}
+  pre{background:#061006;border:1px solid var(--border);border-left:3px solid var(--green-faint);padding:12px 14px;overflow-x:auto;border-radius:4px;}
+  pre code{background:none;border:none;padding:0;color:var(--fg);}
+  table{width:100%;border-collapse:collapse;margin:10px 0;}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #12351f;vertical-align:top;font-size:13px;}
+  th{color:var(--amber);text-transform:uppercase;font-size:11px;letter-spacing:1px;border-bottom:1px solid var(--border);}
+  td{color:var(--fg);} td code{white-space:nowrap;}
+  .note{border:1px solid var(--border);border-left:3px solid var(--amber);background:#0e140e;padding:10px 14px;margin:14px 0;border-radius:4px;font-size:13px;}
+  .note.warn{border-left-color:var(--red);} .note b{color:var(--amber);}
+  .tag{display:inline-block;background:var(--green-dim);color:var(--bg);font-weight:700;font-size:10px;letter-spacing:1px;padding:1px 7px;border-radius:3px;text-transform:uppercase;}
+  .arch{max-width:100%;height:auto;border:1px solid var(--border);border-radius:6px;margin:12px 0;background:#0b0f0b;}
+  footer{border-top:1px solid var(--border);margin-top:40px;padding-top:16px;color:var(--muted);font-size:12px;}
+  hr{border:none;border-top:1px solid var(--border);margin:26px 0;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a href="../" class="brand">p2ptokens<small>// docs</small></a>
+    <nav>
+      <div class="grp">Start</div>
+      <a href="#overview">Overview</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#install">Install</a>
+      <div class="grp">Use</div>
+      <a href="#api">API (/v1)</a>
+      <a href="#fanout">Fan-out</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#backends">Backends</a>
+      <div class="grp">Operate</div>
+      <a href="#configuration">Configuration</a>
+      <a href="#selfhost">Run your own network</a>
+      <a href="#nat">NAT / relay</a>
+      <div class="grp">Understand</div>
+      <a href="#economy">The economy</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#security">Security &amp; privacy</a>
+      <a href="#faq">FAQ</a>
+      <div class="grp">More</div>
+      <a href="https://github.com/pur4v/p2ptokens" target="_blank" rel="noopener">GitHub ↗</a>
+      <a href="https://p2ptokens.com" target="_blank" rel="noopener">p2ptokens.com ↗</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>p2ptokens documentation</h1>
+    <p>A <b>distributed, peer-to-peer, decentralized</b> network for LLM inference. One app both
+    <b>seeds</b> (serves completions from a local model) and <b>leeches</b> (consumes completions from peers),
+    gated by a no-free-lunch upload/download <b>ratio</b> — the seed/leech incentive model of the BitTorrent
+    protocol, applied to inference. A central coordinator brokers matches but <b>never sees your data</b>; the
+    inference bytes flow directly peer-to-peer.</p>
+
+    <h2 id="overview">Overview</h2>
+    <p>p2ptokens has three pieces:</p>
+    <table>
+      <tr><th>Component</th><th>Binary</th><th>Role</th></tr>
+      <tr><td>Client</td><td><code>p2ptokens</code></td><td>Unified seeder + leecher; exposes a local OpenAI-compatible <code>/v1</code> endpoint and a dashboard.</td></tr>
+      <tr><td>Coordinator</td><td><code>p2p-coordinator</code></td><td>Content-blind tracker: registry, O(1) matchmaker, barter-ratio ledger, co-receipt settlement.</td></tr>
+      <tr><td>Desktop</td><td><code>p2ptokens-desktop</code></td><td>Tauri app that embeds the client in a native window.</td></tr>
+    </table>
+    <p>You bring your own model backend (Ollama, any OpenAI-compatible endpoint, or Claude). See the
+    <a href="#architecture">architecture</a> for the full picture.</p>
+
+    <h2 id="quickstart">Quickstart</h2>
+    <p>Requires <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a> with a model pulled.</p>
+<pre><code>ollama pull llama3.2:3b
+cargo build
+
+# terminal 1 — the tracker
+target/debug/p2p-coordinator
+
+# terminal 2 — a seeder (serves your local Ollama)
+target/debug/p2ptokens --http 127.0.0.1:8080 --data-dir ./.p2p/a
+
+# terminal 3 — a leecher
+target/debug/p2ptokens --http 127.0.0.1:8081 --data-dir ./.p2p/b</code></pre>
+    <p>Open the <b>dashboard</b> at <code>http://127.0.0.1:8081</code>, or call the drop-in <code>/v1</code> endpoint:</p>
+<pre><code>curl http://127.0.0.1:8081/v1/chat/completions \
+  -H 'content-type: application/json' \
+  -d '{"model":"llama3.2:3b","messages":[{"role":"user","content":"hi"}],"stream":true}'</code></pre>
+    <p>One-shot end-to-end smoke test: <code>bash scripts/e2e.sh</code>.</p>
+
+    <h2 id="install">Install</h2>
+    <p>Works on <b>macOS, Linux, and Windows</b> — no system dependencies (TLS is statically vendored, so Linux needs no OpenSSL).</p>
+    <h3>Desktop app (recommended)</h3>
+    <p>A double-click app (<code>.dmg</code>/<code>.msi</code>/<code>.AppImage</code>) that embeds the P2P daemon and opens the dashboard — still 100% peer-to-peer.</p>
+    <h3>CLI</h3>
+<pre><code># prebuilt binaries
+curl -fsSL https://p2ptokens.com/install.sh | sh          # macOS / Linux
+irm https://p2ptokens.com/install.ps1 | iex               # Windows
+
+# or with Cargo
+cargo install --git https://github.com/pur4v/p2ptokens p2ptokens-client p2ptokens-coordinator</code></pre>
+    <p>The identity keypair is stored in the per-OS data dir (override with <code>--data-dir</code>).</p>
+
+    <h2 id="api">API — <code>/v1</code></h2>
+    <p>The client serves a drop-in OpenAI-compatible surface. Point any tool's base URL at <code>http://127.0.0.1:8081/v1</code>.</p>
+    <table>
+      <tr><th>Route</th><th>Notes</th></tr>
+      <tr><td><code>POST /v1/chat/completions</code></td><td>Streaming (<code>"stream":true</code>, SSE) and non-streaming. Response includes <code>p2p_provider</code> (the peer that served it).</td></tr>
+      <tr><td><code>GET /v1/models</code></td><td>Network-wide model list.</td></tr>
+      <tr><td><code>GET /api/status</code></td><td>Node status: peer id, ratio, offers, swarm.</td></tr>
+      <tr><td><code>GET /api/config</code></td><td>Brand/network config the dashboard renders (white-label).</td></tr>
+    </table>
+    <div class="note">Tool calling and <code>/v1/responses</code> are on the roadmap (needed for agent workflows); today the surface is chat-completions + models.</div>
+
+    <h2 id="fanout">Fan-out — one prompt, many peers</h2>
+    <p>By default a request goes to one peer. You can fan a single prompt out to several:</p>
+    <table>
+      <tr><th>Mode</th><th>Behavior</th><th>Use for</th></tr>
+      <tr><td><code>single</code></td><td>one provider (default; streams)</td><td>normal chat</td></tr>
+      <tr><td><code>racing</code></td><td>dial K, return the fastest full completion</td><td>lowest latency</td></tr>
+      <tr><td><code>quorum</code></td><td>dial K, return the majority answer + agreement count</td><td>redundancy / catch a bad peer</td></tr>
+      <tr><td><code>ensemble</code></td><td>dial K, return all answers as separate <code>choices</code></td><td>compare models</td></tr>
+    </table>
+    <p>Select it three ways:</p>
+<pre><code># 1) request field
+-d '{"model":"llama3.1:8b","fanout":"quorum","fanout_count":3,"messages":[...]}'
+
+# 2) model-name prefix (works with any OpenAI client)
+-d '{"model":"ensemble:llama3.1:8b","messages":[...]}'
+
+# 3) the dashboard's Chat panel has a mode dropdown + peer count</code></pre>
+    <p>Each peer is metered by its own co-receipt; fan-out modes are non-streaming (they coordinate results).</p>
+
+    <h2 id="dashboard">Dashboard</h2>
+    <p>The client serves an ASCII terminal-themed console with two tabs:</p>
+    <ul>
+      <li><b>Chat</b> — multi-turn chat, conversation history (in your browser), a model picker, the fan-out selector, and per-message provider attribution.</li>
+      <li><b>Network</b> — this node (peer id, ratio, reputation, capacity), what you're seeding, and the live swarm.</li>
+    </ul>
+
+    <h2 id="backends">Bring your own backend</h2>
+    <p>Backends are configured via environment variables (matched by model name):</p>
+<pre><code>export P2P_OLLAMA=1                         # local Ollama (on by default)
+export P2P_ENDPOINT_URL=https://host/v1  P2P_ENDPOINT_KEY=...  P2P_ENDPOINT_MODELS=a,b
+export ANTHROPIC_API_KEY=sk-ant-...      P2P_CLAUDE_MODELS=claude-3-5-sonnet-latest</code></pre>
+    <div class="note warn"><b>Note:</b> proxying paid/hosted API access to strangers may violate that provider's terms. User-borne risk by design; only Ollama (local) is risk-free.</div>
+
+    <h2 id="configuration">Configuration</h2>
+    <p>One <code>p2ptokens.toml</code> configures everything. Precedence (highest first): <b>CLI flags &gt; env vars &gt; <code>p2ptokens.toml</code> &gt; built-in defaults</b>. With no file and no flags you join the public network with default branding.</p>
+<pre><code>[network]     id="public"  name="p2ptokens"  private=false  join_secret=""
+[coordinator] url="https://coordinator.p2ptokens.com"  listen="127.0.0.1:4000"
+[relay]       addr=""            # optional relay multiaddr to reserve a slot on
+[client]      http="127.0.0.1:8080"  p2p_listen="/ip4/0.0.0.0/tcp/0"  capacity=4  relay=false
+[brand]       product_name="p2ptokens"  tagline="…"  accent="#33ff88"  amber="#ffb000"
+              website="https://p2ptokens.com"  github="…"  logo_url=""</code></pre>
+    <p>Load with <code>--config p2ptokens.toml</code> (or place it in the working dir, or set <code>$P2PTOKENS_CONFIG</code>). Override any single value with a flag, e.g. <code>--network-id acme --join-secret …</code>. A fully-commented template ships as <code>p2ptokens.example.toml</code>.</p>
+
+    <h2 id="selfhost">Run your own network <span class="tag">self-host</span></h2>
+    <p>p2ptokens is a platform — fork it and run your org's own private, branded swarm.</p>
+<pre><code>cp p2ptokens.example.toml p2ptokens.toml   # edit [network]/[coordinator]/[brand]
+
+p2p-coordinator --config p2ptokens.toml    # your coordinator (private → needs the secret)
+p2ptokens --config p2ptokens.toml          # each org machine joins the same network + secret</code></pre>
+    <table>
+      <tr><th>Set in config</th><th>Effect</th></tr>
+      <tr><td><code>network.id</code></td><td><b>Isolation</b> — peers on a different id can't open a stream to yours (scoped libp2p protocol).</td></tr>
+      <tr><td><code>private</code> + <code>join_secret</code></td><td><b>Private gate</b> — the coordinator rejects any request without <code>Authorization: Bearer &lt;secret&gt;</code>.</td></tr>
+      <tr><td><code>coordinator.url</code> / <code>relay.addr</code></td><td>Point clients at your coordinator and relay.</td></tr>
+      <tr><td><code>[brand]</code></td><td><b>White-label</b> the dashboard live via <code>/api/config</code> — no rebuild.</td></tr>
+    </table>
+    <div class="note warn"><b>v1 note:</b> coordinator state is in-memory (single instance, no DB yet). Fine for a team; for HA, externalize the registry/ledger to Redis/Postgres (roadmap).</div>
+
+    <h2 id="nat">Running across NAT</h2>
+    <p>Like a modern peer-to-peer client, p2ptokens does the full traversal stack: <b>identify + AutoNAT + UPnP + circuit-relay + DCUtR hole-punching</b>. Run one public relay; peers behind home routers reserve a <code>/p2p-circuit</code> slot and become reachable, with DCUtR upgrading to a direct connection when possible.</p>
+<pre><code># public relay (no backends needed)
+P2P_OLLAMA=0 target/debug/p2ptokens --relay --p2p-listen /ip4/0.0.0.0/tcp/4001
+# a client using it
+target/debug/p2ptokens --relay-addr /ip4/&lt;relay-ip&gt;/tcp/4001/p2p/&lt;relay-peer-id&gt;</code></pre>
+
+    <h2 id="economy">The economy</h2>
+    <p>Access is a no-free-lunch <b>upload/download ratio</b> — you earn the right to leech by seeding. This is p2ptokens' core differentiator; it makes a market where strangers can trade compute without getting cheated.</p>
+    <ul>
+      <li><b>Ratio</b> — served ÷ consumed tokens. Newcomers get a grace allowance, then must keep a healthy ratio to keep leeching.</li>
+      <li><b>Signed co-receipts</b> — output streams in chunks; the consumer co-signs the cumulative token count per chunk, and the provider only continues once it holds the receipt. <b>Neither side can lie by more than one chunk.</b></li>
+      <li><b>Reputation + optimistic unchoke</b> — reputation-weighted matchmaking with reserved newcomer slots (which double as challenge-audits), so fresh peers can bootstrap.</li>
+      <li><b>Signed heartbeats</b> — every registration is signed by the peer's key, so you can't register under someone else's identity (Sybil resistance).</li>
+      <li><b>No money in v1</b> — pure barter. Paid credits/payouts are a later, deliberately deferred step.</li>
+    </ul>
+
+    <h2 id="architecture">Architecture</h2>
+    <p>The control plane (HTTP, metadata only) and the data plane (libp2p, peer-to-peer) are separate — the coordinator brokers matches and moves the ratio, but the inference bytes never touch it.</p>
+    <p><img class="arch" src="architecture.svg" alt="p2ptokens architecture — content-blind coordinator, P2P data plane, relay, fan-out" onerror="this.style.display='none'"></p>
+
+    <h2 id="security">Security &amp; privacy</h2>
+    <ul>
+      <li><b>Content-blind coordinator</b> — it brokers matches and moves the ratio; it never sees or carries a single inference byte.</li>
+      <li><b>Authenticated transport</b> — libp2p Noise (encrypted + mutually authenticated) over TCP + Yamux; dials pin the target <code>PeerId</code>, so a tampered address can't redirect you to another peer.</li>
+      <li><b>Signed co-receipts &amp; heartbeats</b> — the anti-cheat and anti-Sybil core.</li>
+      <li><b>Hardened tracker inputs</b> — structural caps + valid-<code>PeerId</code> checks + a request body-size limit.</li>
+    </ul>
+    <div class="note warn"><b>Honest limit:</b> in v1 the serving peer sees prompts <b>in plaintext</b> — there is no TEE/sandbox yet (contractual only). <b>v1 is for non-sensitive workloads.</b></div>
+
+    <h2 id="faq">FAQ</h2>
+    <h3>Do I need a GPU?</h3>
+    <p>Only if you want to <i>seed</i> a model fast. You can run leech-only; but access is ratio-gated, so a machine that serves nothing will hit the newcomer-grace limit and then be throttled until it seeds.</p>
+    <h3>Does the coordinator see my prompts?</h3>
+    <p>No. It only brokers matches and moves the ratio. Your prompt goes directly to the serving peer over an encrypted libp2p stream. (That peer does see it — see the honest limit above.)</p>
+    <h3>Can I run a fully private network for my org?</h3>
+    <p>Yes — see <a href="#selfhost">Run your own network</a>: set a <code>network.id</code> (isolation) and a <code>join_secret</code> (private gate), and brand it via <code>[brand]</code>.</p>
+    <h3>Is there money involved?</h3>
+    <p>Not in v1 — it's pure barter (a ratio). No wallets, no KYC.</p>
+    <h3>What models can I use?</h3>
+    <p>Anything your backend serves: local Ollama models, any OpenAI-compatible endpoint, or Claude (BYO credentials). Matching is by model name.</p>
+
+    <footer>
+      p2ptokens · <a href="https://p2ptokens.com">p2ptokens.com</a> ·
+      <a href="https://github.com/pur4v/p2ptokens">GitHub</a> ·
+      built by <a href="https://x.com/itspur4v" target="_blank" rel="noopener">@itspur4v</a> ·
+      <a href="https://p2ptokens.com/privacy">Privacy</a> · <a href="https://p2ptokens.com/terms">Terms</a>
+      <br><br><span style="color:var(--muted)">v1 · distributed · peer-to-peer · decentralized LLM inference</span>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
