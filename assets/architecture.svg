@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" role="img" aria-label="p2ptokens architecture">
   <defs>
     <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <marker id="ag" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#33ff88"/></marker>
+    <marker id="ag" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto-start-reverse"><path d="M0,0 L8,3 L0,6 Z" fill="#33ff88"/></marker>
     <marker id="aa" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#ffb000"/></marker>
   </defs>
 
@@ -84,9 +84,9 @@
 
   <!-- DATA PLANE (green solid): P2P streams, consumer -> seeders (fan-out) + swarm mesh -->
   <g stroke="#33ff88" stroke-width="2.4" fill="none" filter="url(#glow)">
-    <path d="M316 496 C 480 470, 640 440, 742 418" marker-end="url(#ag)"/>
-    <path d="M316 520 C 380 530, 410 522, 430 518" marker-end="url(#ag)"/>
-    <path d="M316 560 C 470 620, 580 610, 648 600" marker-end="url(#ag)"/>
+    <path d="M316 496 C 480 470, 640 440, 742 418" marker-start="url(#ag)" marker-end="url(#ag)"/>
+    <path d="M316 520 C 380 530, 410 522, 430 518" marker-start="url(#ag)" marker-end="url(#ag)"/>
+    <path d="M316 560 C 470 620, 580 610, 648 600" marker-start="url(#ag)" marker-end="url(#ag)"/>
   </g>
   <!-- swarm interconnections (thin) -->
   <g stroke="#1c7a44" stroke-width="1.6" fill="none" opacity="0.8">
@@ -94,7 +94,7 @@
     <path d="M620 540 L 648 585"/>
   </g>
   <!-- data-plane explanation is in the legend (top-left); the green arrows are the P2P streams -->
-  <text x="326" y="452" fill="#4f7a63" font-size="11">libp2p stream ▸</text>
+  <text x="326" y="452" fill="#4f7a63" font-size="11">libp2p stream ⇄</text>
 
   <!-- CAPTION -->
   <rect x="34" y="642" width="946" height="34" rx="8" fill="#0e140e" stroke="#1f5a3a"/>
