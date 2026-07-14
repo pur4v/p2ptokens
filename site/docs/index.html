@@ -64,6 +64,7 @@
       <a href="#economy">The economy</a>
       <a href="#architecture">Architecture</a>
       <a href="#security">Security &amp; privacy</a>
+      <a href="#reliability">Reliability &amp; limits</a>
       <a href="#faq">FAQ</a>
       <div class="grp">More</div>
       <a href="https://github.com/pur4v/p2ptokens" target="_blank" rel="noopener">GitHub ↗</a>
@@ -220,6 +221,18 @@ target/debug/p2ptokens --relay-addr /ip4/&lt;relay-ip&gt;/tcp/4001/p2p/&lt;relay
       <li><b>Hardened tracker inputs</b> — structural caps + valid-<code>PeerId</code> checks + a request body-size limit.</li>
     </ul>
     <div class="note warn"><b>Honest limit:</b> in v1 the serving peer sees prompts <b>in plaintext</b> — there is no TEE/sandbox yet (contractual only). <b>v1 is for non-sensitive workloads.</b></div>
+
+    <h2 id="reliability">Reliability &amp; abuse limits</h2>
+    <p>A swarm is only useful if a flaky, slow, or hostile peer can't wedge your request. p2ptokens hardens the failure paths, not just the happy path:</p>
+    <ul>
+      <li><b>Automatic seeder failover</b> — if a seeder disconnects, has a stale address, or the dial fails, the leecher re-matches to a <i>different</i> seeder (bounded attempts, backoff, and a per-request tried-peers exclusion set). Failover only happens before any token is streamed, so answers are never duplicated.</li>
+      <li><b>Dial / first-token / idle timeouts</b> — a seeder that never connects, never sends a first token, or goes silent mid-stream is dropped and the request re-matched — no infinite hangs.</li>
+      <li><b>Seeder-set input-size limit, honored by matchmaking</b> — each node advertises a <code>max_input_bytes</code> it will accept; the coordinator skips seeders whose limit is smaller than the request, and the seeder enforces it on receipt — a consumer can't force a peer to process an oversized/abusive payload.</li>
+      <li><b>Output-token cap</b> — each node caps generated tokens per job (<code>max_output_tokens</code>) so a consumer can't request an unbounded generation on someone else's compute.</li>
+      <li><b>Settle retry</b> — a provider retries settlement so a transient coordinator hiccup doesn't drop credit for work already done.</li>
+      <li><b>Job TTL sweep</b> — abandoned jobs (race losers, crashed consumers) are swept so they can't accumulate.</li>
+    </ul>
+    <p>Configure per node in <code>p2ptokens.toml</code>: <code>[client] max_input_bytes</code>, <code>max_output_tokens</code>.</p>
 
     <h2 id="faq">FAQ</h2>
     <h3>Do I need a GPU?</h3>

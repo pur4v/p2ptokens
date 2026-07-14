@@ -34,6 +34,11 @@ http = "127.0.0.1:8080"           # local dashboard + /v1 endpoint
 p2p_listen = "/ip4/0.0.0.0/tcp/0" # libp2p listen address
 capacity = 4                       # max concurrent jobs this node serves
 relay = false                      # set true to run this node as a public relay server
+max_input_bytes = 8388608          # abuse guard: biggest request (bytes) this node will serve.
+                                   # Advertised so matchmaking skips it for larger requests, and
+                                   # enforced on receipt. 0 = unlimited. Default 8 MiB.
+max_output_tokens = 4096           # cap generated tokens per job (stops unbounded generations).
+                                   # 0 = no cap.
 
 [brand]
 # White-label the dashboard (served at runtime via /api/config — no rebuild).

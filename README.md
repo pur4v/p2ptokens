@@ -294,6 +294,36 @@ protocol assumes everyone is hostile.
 
 ---
 
+## Reliability & abuse limits
+
+A swarm is only useful if a flaky, slow, or hostile peer can't wedge your request.
+p2ptokens hardens the failure paths, not just the happy path:
+
+- **Automatic seeder failover (retry to a different peer).** If a chosen seeder
+  disconnects, its address is stale, or the dial fails, the leecher **re-matches to
+  a *different* seeder** — bounded attempts, backoff, and a per-request
+  tried-peers **exclusion set** so it never loops on the same bad node. Failover
+  only happens *before* any token is streamed, so answers are never duplicated.
+- **Dial / first-token / idle timeouts.** A seeder that never connects, never sends
+  a first token, or goes silent mid-stream is dropped and the request re-matched —
+  no infinite hangs.
+- **Seeder-set input-size limit, honored by matchmaking.** Each node advertises a
+  `max_input_bytes` it will accept; the coordinator **skips seeders whose limit is
+  smaller than the request**, and the seeder **enforces it on receipt** — a
+  consumer can't force a peer to process an oversized/abusive payload.
+- **Output-token cap.** Each node caps generated tokens per job
+  (`max_output_tokens`) so a consumer can't request an unbounded generation on
+  someone else's compute.
+- **Settle retry.** A provider retries settlement so a transient coordinator hiccup
+  doesn't drop credit for work already done.
+- **Job TTL sweep.** Abandoned jobs (race losers, crashed consumers) are swept so
+  they can't accumulate.
+
+Configure the limits per node in `p2ptokens.toml` (`[client] max_input_bytes`,
+`max_output_tokens`).
+
+---
+
 ## Performance & scaling
 
 The coordinator is the only central piece and it only touches lightweight
