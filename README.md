@@ -174,12 +174,10 @@ cargo tauri dev --config crates/desktop/tauri.conf.json   # local dev
 Two binaries: `p2ptokens` (client) and `p2p-coordinator`.
 
 ```sh
-# prebuilt binaries — macOS / Linux
-curl -fsSL https://p2ptokens.com/install.sh | sh
-# Windows (PowerShell)
-irm https://p2ptokens.com/install.ps1 | iex
+# prebuilt binaries — from the GitHub Releases page (macOS / Linux / Windows)
+# https://github.com/pur4v/p2ptokens/releases
 
-# or with Cargo (any OS with Rust + Node 20+ for the client's web UI)
+# or build with Cargo (any OS with Rust + Node 20+ for the client's web UI)
 cargo install --git https://github.com/pur4v/p2ptokens p2ptokens-client p2ptokens-coordinator
 ```
 
@@ -262,7 +260,7 @@ p2ptokens --config p2ptokens.toml
 
 Each client ships the full chat UI + a **local SQLite history** (nothing leaves the
 machine but the prompt it sends to a peer). Full walkthrough + a production security
-checklist: **[p2ptokens.com/docs](https://p2ptokens.com/docs)**. Building the client
+checklist: **[the docs site](https://pur4v.github.io/p2ptokens/docs/)**. Building the client
 from source on org machines needs **Node 20+** (see [Quick start](#quick-start)) — or
 ship the prebuilt binaries, which need nothing extra.
 
