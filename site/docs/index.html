@@ -230,6 +230,8 @@ target/debug/p2ptokens --relay-addr /ip4/&lt;relay-ip&gt;/tcp/4001/p2p/&lt;relay
       <li><b>Seeder-set input-size limit, honored by matchmaking</b> — each node advertises a <code>max_input_bytes</code> it will accept; the coordinator skips seeders whose limit is smaller than the request, and the seeder enforces it on receipt — a consumer can't force a peer to process an oversized/abusive payload.</li>
       <li><b>Output-token cap</b> — each node caps generated tokens per job (<code>max_output_tokens</code>) so a consumer can't request an unbounded generation on someone else's compute.</li>
       <li><b>Settle retry</b> — a provider retries settlement so a transient coordinator hiccup doesn't drop credit for work already done.</li>
+      <li><b>Dial-time capacity gate</b> — a seeder raced past its advertised capacity rejects the job (reserve-or-reject) so the leecher re-matches instead of overloading it.</li>
+      <li><b>Barter-ratio hysteresis</b> — once throttled, a consumer must recover a margin above the threshold before regaining access — no flapping at the boundary.</li>
       <li><b>Job TTL sweep</b> — abandoned jobs (race losers, crashed consumers) are swept so they can't accumulate.</li>
     </ul>
     <p>Configure per node in <code>p2ptokens.toml</code>: <code>[client] max_input_bytes</code>, <code>max_output_tokens</code>.</p>

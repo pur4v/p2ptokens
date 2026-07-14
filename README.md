@@ -316,6 +316,10 @@ p2ptokens hardens the failure paths, not just the happy path:
   someone else's compute.
 - **Settle retry.** A provider retries settlement so a transient coordinator hiccup
   doesn't drop credit for work already done.
+- **Dial-time capacity gate.** A seeder raced past its advertised capacity rejects
+  the job (reserve-or-reject) so the leecher re-matches instead of overloading it.
+- **Barter-ratio hysteresis.** Once throttled, a consumer must recover a margin
+  above the threshold before regaining access — no flapping right at the boundary.
 - **Job TTL sweep.** Abandoned jobs (race losers, crashed consumers) are swept so
   they can't accumulate.
 

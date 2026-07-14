@@ -107,7 +107,21 @@ async fn handle(ctx: SharedCtx, peer: PeerId, mut s: libp2p::Stream) -> Result<(
     let adapter_idx = serve.adapter;
     let backend_model = serve.name.clone();
 
-    ctx.in_flight.fetch_add(1, Ordering::SeqCst);
+    // Dial-time capacity gate: atomically reserve a slot; if we've been raced past
+    // the capacity we advertised (two consumers grabbed the last slot), back out and
+    // reject so the leecher re-matches to another seeder instead of overloading us.
+    let reserved = ctx.in_flight.fetch_add(1, Ordering::SeqCst);
+    if ctx.capacity > 0 && reserved >= ctx.capacity {
+        ctx.in_flight.fetch_sub(1, Ordering::SeqCst);
+        let _ = write_msg(
+            &mut s,
+            &Wire::Error {
+                message: "provider at capacity".into(),
+            },
+        )
+        .await;
+        return Ok(());
+    }
     let result = run_job(
         &ctx,
         &mut s,

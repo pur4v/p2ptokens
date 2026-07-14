@@ -21,6 +21,10 @@ const MATCH_MAX_SCAN: usize = 256;
 pub const NEWCOMER_GRACE_TOKENS: u64 = 50_000;
 /// Minimum served/consumed ratio required once past the grace allowance (Q16).
 pub const MIN_RATIO: f64 = 0.5;
+/// Once throttled, a consumer must climb this far ABOVE `MIN_RATIO` to be allowed
+/// again — hysteresis so a consumer sitting right at the boundary doesn't flap
+/// allowed/denied on every request.
+pub const RATIO_HYSTERESIS: f64 = 0.1;
 /// A provider heartbeat older than this is considered offline.
 pub const HEARTBEAT_TTL_MS: u64 = 30_000;
 /// Route roughly every Nth match through a newcomer/audit slot (Q11/Q15).
@@ -138,6 +142,9 @@ pub struct State {
     /// shared bearer secret for a PRIVATE network; when set, requests must
     /// present it. None = open network (public default).
     pub join_secret: Option<String>,
+    /// consumers currently throttled for a low ratio — used for hysteresis so
+    /// access doesn't flap on/off right at `MIN_RATIO`.
+    throttled: DashSet<String>,
     match_counter: AtomicU64,
 }
 
@@ -193,12 +200,31 @@ impl State {
     }
 
     /// Is the consumer allowed to leech right now? Newcomers within the grace
-    /// allowance always pass; past that, the ratio must clear MIN_RATIO.
+    /// allowance always pass; past that, the ratio must clear MIN_RATIO — with
+    /// hysteresis: once throttled, it must recover to MIN_RATIO + RATIO_HYSTERESIS
+    /// before being allowed again, so access doesn't flap at the boundary.
     pub fn consumer_allowed(&self, consumer: &str) -> bool {
-        match self.ledger.get(consumer) {
-            None => true,
-            Some(e) => e.consumed < NEWCOMER_GRACE_TOKENS || e.ratio() >= MIN_RATIO,
+        let ratio = match self.ledger.get(consumer) {
+            None => return true,
+            Some(e) => {
+                if e.consumed < NEWCOMER_GRACE_TOKENS {
+                    return true;
+                }
+                e.ratio()
+            }
+        };
+        let bar = if self.throttled.contains(consumer) {
+            MIN_RATIO + RATIO_HYSTERESIS
+        } else {
+            MIN_RATIO
+        };
+        let allowed = ratio >= bar;
+        if allowed {
+            self.throttled.remove(consumer);
+        } else {
+            self.throttled.insert(consumer.to_string());
         }
+        allowed
     }
 
     /// O(1) sampling core: open the model's index page, take a bounded number of
@@ -740,6 +766,30 @@ mod tests {
         // past grace, healthy ratio → allowed
         st.ledger.insert("h".into(), mk(100_000, 100_000));
         assert!(st.consumer_allowed("h"));
+    }
+
+    #[test]
+    fn ratio_hysteresis_prevents_flapping() {
+        let st = State::default();
+        let set = |served: u64| {
+            let mut e = LedgerEntry::new("c".into(), now_ms());
+            e.consumed = 100_000;
+            e.served = served;
+            st.ledger.insert("c".into(), e);
+        };
+        // ratio 0.4 (< MIN, past grace) → throttled
+        set(40_000);
+        assert!(!st.consumer_allowed("c"));
+        // exactly MIN_RATIO (0.5): still denied — once throttled, needs MIN + HYST
+        set(50_000);
+        assert!(!st.consumer_allowed("c"));
+        // recover to 0.6 (>= MIN + HYST) → allowed, throttle cleared
+        set(60_000);
+        assert!(st.consumer_allowed("c"));
+        // dip to 0.55: not throttled now, so the plain MIN bar applies → allowed
+        // (no flapping right at the boundary)
+        set(55_000);
+        assert!(st.consumer_allowed("c"));
     }
 
     // ---- input validation (unauthenticated heartbeat hardening) ----
