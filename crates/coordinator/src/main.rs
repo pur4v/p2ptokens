@@ -171,7 +171,13 @@ async fn do_match(
         return Json(MatchResponse::RatioExceeded);
     }
 
-    match st.select_provider_req(&req.model, &req.consumer, &req.require) {
+    match st.select_provider_req(
+        &req.model,
+        &req.consumer,
+        &req.require,
+        &req.exclude,
+        req.input_bytes,
+    ) {
         None => Json(MatchResponse::NoProvider),
         Some((provider, multiaddrs, audit, concrete)) => {
             let job_id = uuid::Uuid::new_v4().to_string();

@@ -205,7 +205,14 @@ impl State {
     /// LIVE, non-full candidates (never the consumer itself), lazily prune peers
     /// that vanished, then apply the capability filter with graceful fallback (if
     /// any candidate satisfies the required caps, keep only those; else keep all).
-    fn sample_candidates(&self, req: &ModelId, consumer: &str, require: &ModelCaps) -> Vec<Cand> {
+    fn sample_candidates(
+        &self,
+        req: &ModelId,
+        consumer: &str,
+        require: &ModelCaps,
+        exclude: &[String],
+        input_bytes: u64,
+    ) -> Vec<Cand> {
         let now = now_ms();
         let mut candidates: Vec<Cand> = Vec::new();
         let mut stale: Vec<String> = Vec::new();
@@ -219,13 +226,19 @@ impl State {
                     break;
                 }
                 let pid = entry.key().clone();
-                if pid == consumer {
+                // never the consumer itself, nor a peer this request already tried
+                if pid == consumer || exclude.iter().any(|e| e == &pid) {
                     continue;
                 }
                 match self.providers.get(&pid) {
                     Some(p)
                         if now.saturating_sub(p.last_seen) < HEARTBEAT_TTL_MS
-                            && p.hb.in_flight < p.hb.capacity =>
+                            && p.hb.in_flight < p.hb.capacity
+                            // seeder's own input-size limit: skip if the request is
+                            // bigger than what this peer accepts (abuse guard).
+                            && (p.hb.max_input_bytes == 0
+                                || input_bytes == 0
+                                || input_bytes <= p.hb.max_input_bytes) =>
                     {
                         if let Some(off) = p.hb.offers.iter().find(|o| offer_matches(req, &o.model))
                         {
@@ -282,7 +295,7 @@ impl State {
         req: &ModelId,
         consumer: &str,
     ) -> Option<(String, Vec<String>, bool, ModelId)> {
-        self.select_provider_req(req, consumer, &ModelCaps::default())
+        self.select_provider_req(req, consumer, &ModelCaps::default(), &[], 0)
     }
 
     /// Choose a provider satisfying `require`. Roughly every AUDIT_EVERY-th match
@@ -294,8 +307,10 @@ impl State {
         req: &ModelId,
         consumer: &str,
         require: &ModelCaps,
+        exclude: &[String],
+        input_bytes: u64,
     ) -> Option<(String, Vec<String>, bool, ModelId)> {
-        let mut candidates = self.sample_candidates(req, consumer, require);
+        let mut candidates = self.sample_candidates(req, consumer, require, exclude, input_bytes);
         if candidates.is_empty() {
             return None;
         }
@@ -340,7 +355,7 @@ impl State {
         k: usize,
         require: &ModelCaps,
     ) -> Vec<(String, Vec<String>, bool, ModelId)> {
-        let mut candidates = self.sample_candidates(req, consumer, require);
+        let mut candidates = self.sample_candidates(req, consumer, require, &[], 0);
         candidates.sort_by(|a, b| {
             self.cand_weight(b)
                 .partial_cmp(&self.cand_weight(a))
@@ -439,6 +454,7 @@ mod tests {
             }],
             capacity: cap,
             in_flight: inflight,
+            max_input_bytes: 0,
             pubkey: String::new(),
             sig: String::new(),
         }
@@ -585,7 +601,7 @@ mod tests {
         let require = caps(true);
         for _ in 0..30 {
             let m = st
-                .select_provider_req(&model("llama"), "c", &require)
+                .select_provider_req(&model("llama"), "c", &require, &[], 0)
                 .unwrap();
             assert_eq!(m.0, "capable", "tools request must hit the capable peer");
         }
@@ -595,10 +611,66 @@ mod tests {
         let st2 = State::default();
         st2.register(hb("plain", &model("llama"), 4, 0));
         assert!(
-            st2.select_provider_req(&model("llama"), "c", &require)
+            st2.select_provider_req(&model("llama"), "c", &require, &[], 0)
                 .is_some(),
             "capability filter must fall back when nobody is capable"
         );
+    }
+
+    #[test]
+    fn exclude_skips_tried_providers() {
+        let st = State::default();
+        st.register(hb("a", &model("llama"), 4, 0));
+        st.register(hb("b", &model("llama"), 4, 0));
+        // Excluding "a" (a seeder the leecher already tried) must always give "b".
+        for _ in 0..20 {
+            let m = st
+                .select_provider_req(
+                    &model("llama"),
+                    "c",
+                    &ModelCaps::default(),
+                    &["a".into()],
+                    0,
+                )
+                .unwrap();
+            assert_eq!(m.0, "b");
+        }
+        // Excluding both → no provider (retry loop then surfaces the last error).
+        assert!(st
+            .select_provider_req(
+                &model("llama"),
+                "c",
+                &ModelCaps::default(),
+                &["a".into(), "b".into()],
+                0,
+            )
+            .is_none());
+    }
+
+    #[test]
+    fn input_size_limit_filters_seeders() {
+        let st = State::default();
+        let mut small = hb("small", &model("llama"), 4, 0);
+        small.max_input_bytes = 100;
+        let mut big = hb("big", &model("llama"), 4, 0);
+        big.max_input_bytes = 10_000;
+        st.register(small);
+        st.register(big);
+        // A 500-byte request must never route to the 100-byte-limited seeder.
+        for _ in 0..20 {
+            let m = st
+                .select_provider_req(&model("llama"), "c", &ModelCaps::default(), &[], 500)
+                .unwrap();
+            assert_eq!(m.0, "big");
+        }
+        // Bigger than everyone's limit → no provider.
+        assert!(st
+            .select_provider_req(&model("llama"), "c", &ModelCaps::default(), &[], 50_000)
+            .is_none());
+        // Unknown size (0) → no filter; someone matches.
+        assert!(st
+            .select_provider_req(&model("llama"), "c", &ModelCaps::default(), &[], 0)
+            .is_some());
     }
 
     #[test]

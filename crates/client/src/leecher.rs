@@ -1,10 +1,22 @@
 //! Leecher (consumer) side: get matched by the coordinator, dial the seeder over
 //! libp2p, stream the completion, and co-sign a receipt per chunk (design Q18).
 
-use anyhow::{bail, Result};
+use std::time::Duration;
+
+use anyhow::{anyhow, bail, Result};
 use libp2p::multiaddr::Protocol;
 use libp2p::{Multiaddr, PeerId, StreamProtocol};
 use tokio::sync::mpsc;
+use tokio::time::timeout;
+
+/// How many distinct seeders to try for one request before giving up.
+const MAX_MATCH_ATTEMPTS: usize = 3;
+/// Give up dialing/opening a stream to a seeder after this long → try another.
+const DIAL_TIMEOUT: Duration = Duration::from_secs(20);
+/// If a chosen seeder sends no first token within this long → try another.
+const FIRST_TOKEN_TIMEOUT: Duration = Duration::from_secs(90);
+/// If a streaming seeder goes silent mid-answer for this long → fail the job.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 
 use p2ptokens_shared::api::{MatchManyRequest, MatchResponse};
 use p2ptokens_shared::protocol::{completion_protocol, read_msg, write_msg, Wire};
@@ -77,34 +89,81 @@ pub fn leech_stream(
     rx
 }
 
-/// Core routine: fetch one match, then dial + stream + co-sign receipts.
+/// Approx serialized size of the request messages (bytes), so the coordinator can
+/// skip seeders whose `max_input_bytes` won't accept it.
+fn estimate_input_bytes(messages: &[ChatMessage]) -> u64 {
+    serde_json::to_vec(messages).map(|v| v.len()).unwrap_or(0) as u64
+}
+
+/// Core routine: match a seeder, dial + stream + co-sign receipts — and on failure
+/// re-match to a DIFFERENT seeder (bounded attempts, backoff), as long as no tokens
+/// have been delivered to the caller yet (a mid-stream failover would duplicate
+/// output). Covers seeder disconnects, stale addresses, dial/first-token timeouts.
 async fn run<F: FnMut(&str)>(
     ctx: &SharedCtx,
     model: ModelId,
     messages: Vec<ChatMessage>,
     params: ChatCompletionParams,
-    on_delta: F,
+    mut on_delta: F,
 ) -> Result<CompletionResult> {
     let require = caps_required(&messages);
-    let match_resp = ctx
-        .coord
-        .request_match(&MatchRequest {
-            consumer: ctx.local_peer.to_string(),
-            model,
-            require,
+    let input_bytes = estimate_input_bytes(&messages);
+    let mut tried: Vec<String> = Vec::new();
+    let mut delivered = false;
+    let mut last_err: Option<anyhow::Error> = None;
+
+    for attempt in 0..MAX_MATCH_ATTEMPTS {
+        let match_resp = ctx
+            .coord
+            .request_match(&MatchRequest {
+                consumer: ctx.local_peer.to_string(),
+                model: model.clone(),
+                require: require.clone(),
+                exclude: tried.clone(),
+                input_bytes,
+            })
+            .await?;
+
+        let m = match match_resp {
+            MatchResponse::Matched(m) => m,
+            MatchResponse::NoProvider => {
+                return Err(last_err.unwrap_or_else(|| {
+                    anyhow!(if tried.is_empty() {
+                        "no provider available for this model"
+                    } else {
+                        "no alternative provider available after retries"
+                    })
+                }));
+            }
+            MatchResponse::RatioExceeded => {
+                bail!("rate limited: serve more to restore your ratio before leeching")
+            }
+        };
+
+        let provider = m.provider.clone();
+        let res = run_with_match(ctx, m, messages.clone(), params.clone(), |t| {
+            delivered = true;
+            on_delta(t);
         })
-        .await?;
+        .await;
 
-    // Failure variants carry only a code on the wire; render the message here.
-    let m = match match_resp {
-        MatchResponse::Matched(m) => m,
-        MatchResponse::NoProvider => bail!("no provider available for this model"),
-        MatchResponse::RatioExceeded => {
-            bail!("rate limited: serve more to restore your ratio before leeching")
+        match res {
+            Ok(r) => return Ok(r),
+            Err(e) => {
+                tracing::warn!(provider = %provider, attempt, "leech attempt failed: {e:#}");
+                last_err = Some(e);
+                // Already streamed tokens to the caller → can't switch seeders now
+                // without duplicating output. Stop and surface the error.
+                if delivered {
+                    break;
+                }
+                tried.push(provider);
+                tokio::time::sleep(Duration::from_millis(150 * (attempt as u64 + 1))).await;
+            }
         }
-    };
+    }
 
-    run_with_match(ctx, m, messages, params, on_delta).await
+    Err(last_err.unwrap_or_else(|| anyhow!("all providers failed for this request")))
 }
 
 /// Dial a specific, pre-resolved match, stream the completion, and co-sign a
@@ -131,10 +190,14 @@ async fn run_with_match<F: FnMut(&str)>(
         .map(|a| ensure_peer(a, provider))
         .collect();
 
-    ctx.node.connect(provider, addrs).await?;
+    timeout(DIAL_TIMEOUT, ctx.node.connect(provider, addrs))
+        .await
+        .map_err(|_| anyhow!("dial timed out"))??;
     let mut control = ctx.node.control();
     let proto = StreamProtocol::try_from_owned(completion_protocol(&ctx.network_id))?;
-    let mut s = control.open_stream(provider, proto).await?;
+    let mut s = timeout(DIAL_TIMEOUT, control.open_stream(provider, proto))
+        .await
+        .map_err(|_| anyhow!("open_stream timed out"))??;
 
     write_msg(
         &mut s,
@@ -151,14 +214,26 @@ async fn run_with_match<F: FnMut(&str)>(
     let mut text = String::new();
     let mut cumulative = 0u64;
     let mut finish = "stop".to_string();
+    let mut got_first = false;
 
     loop {
-        match read_msg(&mut s).await? {
+        // Bound how long we wait: a longer budget for the first token, a tighter
+        // one for silence mid-stream. Timeout → error → the caller re-matches.
+        let budget = if got_first {
+            IDLE_TIMEOUT
+        } else {
+            FIRST_TOKEN_TIMEOUT
+        };
+        let next = timeout(budget, read_msg(&mut s))
+            .await
+            .map_err(|_| anyhow!("seeder timed out after {}s", budget.as_secs()))?;
+        match next? {
             Some(Wire::Chunk {
                 seq,
                 text: t,
                 cumulative_tokens,
             }) => {
+                got_first = true;
                 on_delta(&t);
                 text.push_str(&t);
                 cumulative = cumulative_tokens;

@@ -25,6 +25,7 @@ struct SignedBody<'a> {
     offers: &'a [ModelOffer],
     capacity: u32,
     in_flight: u32,
+    max_input_bytes: u64,
 }
 
 fn canonical(hb: &Heartbeat) -> Vec<u8> {
@@ -34,6 +35,7 @@ fn canonical(hb: &Heartbeat) -> Vec<u8> {
         offers: &hb.offers,
         capacity: hb.capacity,
         in_flight: hb.in_flight,
+        max_input_bytes: hb.max_input_bytes,
     })
     .unwrap_or_default()
 }
@@ -80,6 +82,7 @@ mod tests {
             }],
             capacity: 4,
             in_flight: 0,
+            max_input_bytes: 0,
             pubkey: String::new(),
             sig: String::new(),
         }

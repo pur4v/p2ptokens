@@ -54,6 +54,10 @@ pub struct RunConfig {
     pub join_secret: Option<String>,
     /// white-label branding served to the dashboard
     pub brand: BrandConfig,
+    /// max request input size (bytes) this node serves (advertised + enforced)
+    pub max_input_bytes: u64,
+    /// cap on output tokens generated per job (0 = no cap)
+    pub max_output_tokens: u32,
 }
 
 impl RunConfig {
@@ -74,6 +78,8 @@ impl RunConfig {
             network_id: cfg.network.id,
             join_secret,
             brand: cfg.brand,
+            max_input_bytes: cfg.client.max_input_bytes,
+            max_output_tokens: cfg.client.max_output_tokens,
         }
     }
 }
@@ -234,6 +240,8 @@ pub async fn run(cfg: RunConfig) -> Result<()> {
         network_id: cfg.network_id.clone(),
         brand: cfg.brand.clone(),
         threads: Arc::new(threads::ThreadStore::open(&data_dir.join("history.db"))?),
+        max_input_bytes: cfg.max_input_bytes,
+        max_output_tokens: cfg.max_output_tokens,
     });
 
     // Seeder: serve inbound completion streams.
@@ -275,6 +283,7 @@ pub async fn run(cfg: RunConfig) -> Result<()> {
                     offers,
                     capacity: ctx.capacity,
                     in_flight: ctx.in_flight.load(Ordering::SeqCst),
+                    max_input_bytes: ctx.max_input_bytes,
                     pubkey: String::new(),
                     sig: String::new(),
                 };

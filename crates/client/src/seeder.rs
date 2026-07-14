@@ -66,6 +66,34 @@ async fn handle(ctx: SharedCtx, peer: PeerId, mut s: libp2p::Stream) -> Result<(
         }
     };
 
+    // Enforce this seeder's own input-size limit (abuse guard): refuse to process
+    // an oversized/hostile payload rather than feeding it to the backend.
+    if ctx.max_input_bytes > 0 {
+        let sz = serde_json::to_vec(&messages).map(|v| v.len()).unwrap_or(0) as u64;
+        if sz > ctx.max_input_bytes {
+            let _ = write_msg(
+                &mut s,
+                &Wire::Error {
+                    message: format!(
+                        "request too large: {sz} bytes exceeds this peer's limit ({})",
+                        ctx.max_input_bytes
+                    ),
+                },
+            )
+            .await;
+            return Ok(());
+        }
+    }
+    // Cap output tokens to this seeder's configured maximum (defends against a
+    // consumer requesting an unbounded generation).
+    let mut params = params;
+    if ctx.max_output_tokens > 0 {
+        params.max_tokens = Some(match params.max_tokens {
+            Some(n) => n.min(ctx.max_output_tokens),
+            None => ctx.max_output_tokens,
+        });
+    }
+
     let Some(serve) = ctx.model_index.get(&model) else {
         let _ = write_msg(
             &mut s,
@@ -191,24 +219,39 @@ async fn run_job(
         ctx.tps_ema.store(ema.to_bits(), Ordering::Relaxed);
     }
 
-    // Settle the highest-seq consumer-signed receipt with the coordinator.
+    // Settle the highest-seq consumer-signed receipt with the coordinator. Retry a
+    // few times with backoff so a transient coordinator hiccup doesn't drop credit
+    // for work already done.
     if let Some(receipt) = latest {
-        match ctx
-            .coord
-            .settle(&SettleRequest {
-                receipt,
-                consumer_pubkey,
-                completed: true,
-            })
-            .await
-        {
-            Ok(resp) => tracing::info!(
-                job = job_id,
-                model = model_key,
-                served_total = resp.provider_served_total,
-                "job settled"
-            ),
-            Err(e) => tracing::warn!(job = job_id, "settle failed: {e:#}"),
+        let req = SettleRequest {
+            receipt,
+            consumer_pubkey,
+            completed: true,
+        };
+        let mut settled = false;
+        for attempt in 0..3u32 {
+            match ctx.coord.settle(&req).await {
+                Ok(resp) => {
+                    tracing::info!(
+                        job = job_id,
+                        model = model_key,
+                        served_total = resp.provider_served_total,
+                        "job settled"
+                    );
+                    settled = true;
+                    break;
+                }
+                Err(e) => {
+                    tracing::warn!(job = job_id, attempt, "settle failed: {e:#}");
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        200 * (attempt as u64 + 1),
+                    ))
+                    .await;
+                }
+            }
+        }
+        if !settled {
+            tracing::warn!(job = job_id, "settle gave up after retries");
         }
     }
     Ok(())

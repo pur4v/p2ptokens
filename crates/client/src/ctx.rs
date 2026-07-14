@@ -43,6 +43,10 @@ pub struct Ctx {
     pub brand: BrandConfig,
     /// local SQLite chat history (threads + messages)
     pub threads: Arc<crate::threads::ThreadStore>,
+    /// max request input size (bytes) this node serves (advertised + enforced by the seeder)
+    pub max_input_bytes: u64,
+    /// cap on output tokens generated per served job (0 = no cap)
+    pub max_output_tokens: u32,
 }
 
 pub type SharedCtx = Arc<Ctx>;

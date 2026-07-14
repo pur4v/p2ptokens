@@ -17,6 +17,11 @@ fn is_zero(v: &f64) -> bool {
     *v == 0.0
 }
 
+/// serde predicate: omit a zero u64 on the wire.
+fn is_zero_u64(v: &u64) -> bool {
+    *v == 0
+}
+
 /// Coarse model capabilities — advertised by a seeder and optionally required by
 /// a consumer for capability-aware matching. All false by default (= unknown), so
 /// they cost nothing on the wire and stay backward-compatible.
@@ -91,6 +96,11 @@ pub struct Heartbeat {
     /// max concurrent jobs this seeder will accept right now
     pub capacity: u32,
     pub in_flight: u32,
+    /// max request input size (bytes) this seeder accepts — its own limit so a
+    /// consumer can't force it to process an oversized/abusive payload.
+    /// Matchmaking skips seeders whose limit is below the request. 0 = unlimited.
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub max_input_bytes: u64,
     /// sender's public key (b64 protobuf) — proves the heartbeat came from the
     /// holder of `peer_id`. Verified by the coordinator (see shared `auth`).
     #[serde(default)]
@@ -109,6 +119,15 @@ pub struct MatchRequest {
     /// if no capable provider exists the coordinator falls back to any provider.
     #[serde(default, skip_serializing_if = "ModelCaps::is_empty")]
     pub require: ModelCaps,
+    /// peer ids to skip (providers this consumer already tried and that failed
+    /// this request) so a retry re-matches to a *different* seeder. Empty = none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
+    /// approximate serialized size (bytes) of this request's messages, so the
+    /// coordinator only matches seeders whose `max_input_bytes` accepts it.
+    /// 0 = unknown (no size filter).
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub input_bytes: u64,
 }
 
 /// The coordinator's answer: a seeder to dial, plus a signed job grant.

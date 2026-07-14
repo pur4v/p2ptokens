@@ -71,6 +71,13 @@ pub struct ClientConfig {
     pub capacity: u32,
     /// Run as a public circuit-relay server (rendezvous for NAT'd peers).
     pub relay: bool,
+    /// Max request input size (bytes) this node will serve. Advertised so
+    /// matchmaking skips it for bigger requests, and enforced on receipt — stops
+    /// a consumer forcing an oversized/abusive payload. 0 = unlimited.
+    pub max_input_bytes: u64,
+    /// Cap on output tokens this node will generate per job (defends against a
+    /// consumer requesting an unbounded generation). 0 = no cap.
+    pub max_output_tokens: u32,
 }
 
 impl Default for ClientConfig {
@@ -80,6 +87,8 @@ impl Default for ClientConfig {
             p2p_listen: "/ip4/0.0.0.0/tcp/0".into(),
             capacity: 4,
             relay: false,
+            max_input_bytes: 8 * 1024 * 1024, // 8 MiB — matches the wire frame cap
+            max_output_tokens: 4096,
         }
     }
 }
