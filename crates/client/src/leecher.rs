@@ -113,7 +113,8 @@ async fn run<F: FnMut(&str)>(
     let mut last_err: Option<anyhow::Error> = None;
 
     for attempt in 0..MAX_MATCH_ATTEMPTS {
-        let match_resp = ctx
+        // A briefly-unreachable coordinator is retryable, not a hard failure.
+        let match_resp = match ctx
             .coord
             .request_match(&MatchRequest {
                 consumer: ctx.local_peer.to_string(),
@@ -122,7 +123,16 @@ async fn run<F: FnMut(&str)>(
                 exclude: tried.clone(),
                 input_bytes,
             })
-            .await?;
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!(attempt, "coordinator match request failed: {e:#}");
+                last_err = Some(e);
+                tokio::time::sleep(Duration::from_millis(200 * (attempt as u64 + 1))).await;
+                continue;
+            }
+        };
 
         let m = match match_resp {
             MatchResponse::Matched(m) => m,
