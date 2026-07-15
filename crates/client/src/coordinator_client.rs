@@ -17,9 +17,21 @@ pub struct CoordinatorClient {
 
 impl CoordinatorClient {
     pub fn new(base: String, secret: Option<String>) -> Self {
+        // Always bound coordinator calls. Without a timeout a stalled connection
+        // (half-open TCP, a briefly overloaded tracker) makes `.await` hang
+        // forever — and because the heartbeat loop awaits it in place, a single
+        // hung heartbeat silently stops ALL heartbeats. The coordinator then
+        // TTL-expires this peer (HEARTBEAT_TTL_MS) and a live, serving seeder
+        // becomes permanently unmatchable. Fail fast instead so the next tick
+        // re-registers us.
+        let http = reqwest::Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .timeout(std::time::Duration::from_secs(15))
+            .build()
+            .unwrap_or_default();
         Self {
             base: base.trim_end_matches('/').to_string(),
-            http: reqwest::Client::new(),
+            http,
             secret,
         }
     }
